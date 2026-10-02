@@ -1,0 +1,8 @@
+{
+  "name": "Remix MOH-PMD",
+  "description": "Ministry of Health Project Performance, Service Delivery \u0026 Operational Management System (PP-SDOMS) for tracking priority flagships, projects, action points, activities, meetings, reports, visitors, mail, and performance contracts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
