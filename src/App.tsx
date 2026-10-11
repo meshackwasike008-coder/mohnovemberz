@@ -113,6 +113,12 @@ export default function App() {
   const [dashSearch, setDashSearch] = useState('');
   const [dashDisplayCount, setDashDisplayCount] = useState(6);
 
+  // Gantt Chart Toggle States
+  const [ganttDisplayMode, setGanttDisplayMode] = useState<'all' | 'directorate' | 'saga'>('all');
+  const [ganttSelectedDirectorate, setGanttSelectedDirectorate] = useState<string>('Directorate for Family Health');
+  const [ganttSelectedSaga, setGanttSelectedSaga] = useState<string>('Kenyatta National Hospital');
+  const [selectedDirectorateForDivisions, setSelectedDirectorateForDivisions] = useState<string | null>(null);
+
   const toggleProgramme = (id: number) => {
     setExpandedProgrammes(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -399,12 +405,6 @@ export default function App() {
 
             {/* User Role Switcher Pill */}
             <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-full border border-white/20">
-              <img 
-                src="/public/assets/images/avatar.png" 
-                alt="Avatar" 
-                className="w-7 h-7 rounded-full object-cover border border-sky-300"
-                onError={(e: any) => { e.target.src = '/src/assets/images/avatar_system_admin_1790239749304.jpg'; }}
-              />
               <div className="text-left hidden sm:block">
                 <div className="text-xs font-bold leading-none text-white">{currentUser.full_name}</div>
                 <div className="text-[10px] text-sky-200">[{currentUser.role}]</div>
@@ -813,27 +813,15 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Overall Progress</h4>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
-                        <div className="bg-blue-700 h-full rounded-full transition-all" style={{ width: `${selectedFlagship.progress_pct}%` }}></div>
-                      </div>
-                      <span className="text-base font-black text-blue-700">{selectedFlagship.progress_pct}%</span>
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                  <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Overall Progress</h4>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
+                      <div className="bg-blue-700 h-full rounded-full transition-all" style={{ width: `${selectedFlagship.progress_pct}%` }}></div>
                     </div>
-                    <p className="text-xs text-slate-600 mt-3">{selectedFlagship.description}</p>
+                    <span className="text-base font-black text-blue-700">{selectedFlagship.progress_pct}%</span>
                   </div>
-
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 text-center">
-                    <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Risk Assessment</h4>
-                    <div className="flex justify-center gap-2 my-2">
-                      <span className="w-6 h-6 rounded-full bg-red-600 inline-block"></span>
-                      <span className="w-6 h-6 rounded-full bg-amber-500 inline-block"></span>
-                      <span className="w-6 h-6 rounded-full bg-slate-200 inline-block"></span>
-                    </div>
-                    <div className="text-base font-bold text-red-600 uppercase">{selectedFlagship.risk_level} Risk</div>
-                  </div>
+                  <p className="text-xs text-slate-600 mt-3">{selectedFlagship.description}</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -923,9 +911,6 @@ export default function App() {
                         <div className="flex justify-between items-center mb-2">
                           <span className="bg-red-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
                             {f.priority_tier}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-600 border border-slate-200 px-2 py-0.5 rounded bg-slate-50">
-                            {f.risk_level} Risk
                           </span>
                         </div>
                         <h3 
@@ -1262,33 +1247,49 @@ export default function App() {
 
                         {/* Overall Statistics (Gantt Chart) Card */}
                         <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-                          <h3 className="font-extrabold text-xs text-slate-900 mb-4">Overall Statistics (Gantt Chart):</h3>
-                          <div className="space-y-2">
+                          <div className="flex justify-between items-center mb-3">
+                            <h3 className="font-extrabold text-xs text-slate-900">Monthly Progress Statistics (Gantt Chart vs. Month):</h3>
+                            <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Progress vs Month</span>
+                          </div>
+                          <div className="space-y-3">
                             <div className="grid grid-cols-12 items-center gap-3">
                               {/* Task Title on Left */}
                               <div className="col-span-12 sm:col-span-4 text-blue-700 font-bold text-xs truncate" title={selectedProject.gantt_task_name || "Improve Viral Load Suppression Rate"}>
                                 {selectedProject.gantt_task_name || "Improve Viral Load Suppression Rate"}
                               </div>
 
-                              {/* Gantt Bar spanning Feb to Jun */}
+                              {/* Gantt Bar spanning Feb to Jun with monthly progress labels */}
                               <div className="col-span-12 sm:col-span-8">
-                                <div className="w-full bg-slate-100 rounded-md h-7 overflow-hidden flex border border-slate-200 shadow-inner">
-                                  {/* Left dark blue section */}
-                                  <div className="bg-[#1565c0] h-full" style={{ width: '60%' }} title="Phase 1: Completed"></div>
-                                  {/* Right bright blue section */}
-                                  <div className="bg-[#1976d2] h-full" style={{ width: '40%' }} title="Phase 2: In Progress"></div>
+                                <div className="w-full bg-slate-100 rounded-md h-8 overflow-hidden flex border border-slate-200 shadow-inner">
+                                  <div className="bg-[#1565c0] h-full flex items-center justify-center text-[10px] text-white font-mono font-bold" style={{ width: '20%' }} title="Feb: 24.1%">24.1%</div>
+                                  <div className="bg-[#1976d2] h-full flex items-center justify-center text-[10px] text-white font-mono font-bold" style={{ width: '20%' }} title="Mar: 37.5%">37.5%</div>
+                                  <div className="bg-[#0ea5e9] h-full flex items-center justify-center text-[10px] text-white font-mono font-bold" style={{ width: '20%' }} title="Apr: 51.4%">51.4%</div>
+                                  <div className="bg-[#2563eb] h-full flex items-center justify-center text-[10px] text-white font-mono font-bold" style={{ width: '20%' }} title="May: 65.4%">65.4%</div>
+                                  <div className="bg-[#40B5AD] h-full flex items-center justify-center text-[10px] text-white font-mono font-bold" style={{ width: '20%' }} title="Jun: 79.5%">79.5%</div>
                                 </div>
 
-                                {/* Month scale ticks */}
+                                {/* Month scale ticks with achievement percentages */}
                                 <div className="grid grid-cols-5 text-center pt-2 text-[11px] text-slate-700 font-medium">
                                   <div>
-                                    <div className="font-bold">Feb</div>
-                                    <div className="text-[10px] text-slate-500 font-mono">2026</div>
+                                    <div className="font-bold">Feb 2026</div>
+                                    <div className="text-[10px] text-blue-700 font-mono font-bold">24.1%</div>
                                   </div>
-                                  <div className="pt-0.5">Mar</div>
-                                  <div className="pt-0.5">Apr</div>
-                                  <div className="pt-0.5">May</div>
-                                  <div className="pt-0.5">Jun</div>
+                                  <div>
+                                    <div className="font-bold">Mar 2026</div>
+                                    <div className="text-[10px] text-blue-700 font-mono font-bold">37.5%</div>
+                                  </div>
+                                  <div>
+                                    <div className="font-bold">Apr 2026</div>
+                                    <div className="text-[10px] text-blue-700 font-mono font-bold">51.4%</div>
+                                  </div>
+                                  <div>
+                                    <div className="font-bold">May 2026</div>
+                                    <div className="text-[10px] text-blue-700 font-bold">65.4%</div>
+                                  </div>
+                                  <div>
+                                    <div className="font-bold">Jun 2026</div>
+                                    <div className="text-[10px] text-emerald-700 font-mono font-black">79.5%</div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1726,8 +1727,8 @@ export default function App() {
             ) : (
               // Projects Main View Matching project-main-page.png, Directorates, SAGAS, Divisions, Lazy Load Table & Gantt
               <div className="space-y-6">
-                {/* Top 3 Banners / Cards: Directorates, SAGAS, Divisions (Matching project-main-page.png) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* Top 2 Banners / Cards: Directorates, SAGAS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Directorate Card */}
                   <div 
                     onClick={() => setProjectsSubView('directorates')}
@@ -1760,23 +1761,6 @@ export default function App() {
                       </div>
                     </div>
                     <ArrowUpRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-700 transition transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </div>
-
-                  {/* Divisions Card */}
-                  <div 
-                    onClick={() => setProjectsSubView('divisions')}
-                    className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition cursor-pointer flex items-center justify-between group border-l-4 border-l-indigo-600"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shadow-inner">
-                        <Layers className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-700 transition">Divisions</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Filter &amp; manage ministerial divisions</p>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-700 transition transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </div>
                 </div>
 
@@ -1871,21 +1855,18 @@ export default function App() {
                         'Kenya National Blood Transfusion Service (KNBTS)',
                         'National Spinal Injury Referral Hospital (NSIRH)'
                       ].map((sagaName, idx) => (
-                        <div key={idx} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+                        <div key={idx} className="bg-[#1976d2] text-white rounded-xl p-5 shadow-md flex flex-col justify-between space-y-4 hover:bg-[#1565c0] transition">
                           <div>
-                            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-black mb-3">
-                              SAGA
-                            </div>
-                            <h3 className="font-black text-slate-900 text-sm">{sagaName}</h3>
-                            <p className="text-xs text-slate-500 mt-1">Specialized National Referral &amp; Agency Facility</p>
+                            <h3 className="font-extrabold text-base text-white">{sagaName}</h3>
+                            <p className="text-xs text-blue-100 mt-1.5 opacity-90">Specialized National Referral &amp; Agency Facility</p>
                           </div>
-                          <div className="pt-3 border-t border-slate-100 flex justify-end">
+                          <div className="pt-3 border-t border-blue-400/30 flex justify-end">
                             <button 
                               onClick={() => {
                                 setProjFilterSaga(sagaName);
                                 setProjectsSubView('portfolio');
                               }}
-                              className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded text-xs transition"
+                              className="bg-white text-blue-800 hover:bg-blue-50 font-bold px-3 py-1.5 rounded text-xs transition shadow-sm"
                             >
                               View Details
                             </button>
@@ -2205,39 +2186,194 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Gantt Chart / Performance Graph Across All Projects */}
+                    {/* Gantt Chart / Performance Graph with Toggle ('All Projects', 'Selected Directorate', 'Sagas') */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                      <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-3">
                         <div className="flex items-center gap-2">
                           <Milestone className="w-5 h-5 text-blue-700" />
-                          <h3 className="text-sm font-black text-slate-900">General Performance &amp; Progress Across All Projects (Gantt Overview)</h3>
+                          <h3 className="text-sm font-black text-slate-900">Overall Project Progress by Month — KPI Contribution</h3>
                         </div>
-                        <span className="text-xs font-bold text-slate-500 font-mono">2026/2027 Execution Cycle</span>
+
+                        {/* Toggle Bar */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-bold border border-slate-200">
+                            <button
+                              onClick={() => setGanttDisplayMode('all')}
+                              className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'all' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
+                            >
+                              All Projects
+                            </button>
+                            <button
+                              onClick={() => setGanttDisplayMode('directorate')}
+                              className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'directorate' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
+                            >
+                              Selected Directorate
+                            </button>
+                            <button
+                              onClick={() => setGanttDisplayMode('saga')}
+                              className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'saga' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
+                            >
+                              SAGAs
+                            </button>
+                          </div>
+
+                          {ganttDisplayMode === 'directorate' && (
+                            <select
+                              value={ganttSelectedDirectorate}
+                              onChange={(e) => setGanttSelectedDirectorate(e.target.value)}
+                              className="bg-slate-50 border border-slate-300 rounded p-1.5 text-xs font-semibold text-slate-800"
+                            >
+                              {Array.from(new Set(projects.filter(p => p.directorate_name).map(p => p.directorate_name))).map(d => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          )}
+
+                          {ganttDisplayMode === 'saga' && (
+                            <select
+                              value={ganttSelectedSaga}
+                              onChange={(e) => setGanttSelectedSaga(e.target.value)}
+                              className="bg-slate-50 border border-slate-300 rounded p-1.5 text-xs font-semibold text-slate-800"
+                            >
+                              {Array.from(new Set(projects.filter(p => p.saga_name).map(p => p.saga_name))).map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="space-y-3 pt-2">
-                        {projects.slice(0, 5).map((pr, idx) => {
-                          const { pct } = getProjectCalculatedProgress(pr, kpis);
-                          return (
-                            <div key={pr.id} className="grid grid-cols-12 items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                              <div className="col-span-12 md:col-span-4 text-xs font-extrabold text-slate-900 truncate" title={pr.sub_programme}>
-                                {idx + 1}. {pr.sub_programme}
+                      {/* Stacked Gantt Chart matching graph.png layout */}
+                      {(() => {
+                        let targetProjects = projects;
+                        if (ganttDisplayMode === 'directorate') {
+                          targetProjects = projects.filter(p => p.directorate_name === ganttSelectedDirectorate);
+                        } else if (ganttDisplayMode === 'saga') {
+                          targetProjects = projects.filter(p => p.saga_name === ganttSelectedSaga);
+                        }
+                        const avgPct = targetProjects.length > 0 ? targetProjects.reduce((acc, p) => acc + getProjectCalculatedProgress(p, kpis).pct, 0) / targetProjects.length : 40;
+                        const factor = avgPct / 41.3;
+
+                        const baseTotals = [41.3, 40.9, 40.5, 40.0, 39.5, 39.0, 38.3, 37.7];
+                        const monthLabels = ['Aug 2026', 'Jul 2026', 'Jun 2026', 'May 2026', 'Apr 2026', 'Mar 2026', 'Feb 2026', 'Jan 2026'];
+                        
+                        const monthsData = baseTotals.map((tot, idx) => {
+                          const total = Number((tot * (avgPct / 41.3)).toFixed(1));
+                          return {
+                            month: monthLabels[idx],
+                            a: Number((total * 0.10).toFixed(1)), // 10%
+                            b: Number((total * 0.15).toFixed(1)), // 15%
+                            c: Number((total * 0.65).toFixed(1)), // 65%
+                            d: Number((total * 0.02).toFixed(1)), // 2%
+                            e: Number((total * 0.04).toFixed(1)), // 4%
+                            f: Number((total * 0.04).toFixed(1)), // 4%
+                            total
+                          };
+                        });
+
+                        return (
+                          <div className="space-y-4 pt-2">
+                            <div className="text-xs font-bold text-slate-600">
+                              Showing {targetProjects.length} project(s) for <strong>{ganttDisplayMode === 'all' ? 'All Projects' : ganttDisplayMode === 'directorate' ? ganttSelectedDirectorate : ganttSelectedSaga}</strong>
+                            </div>
+
+                            {/* Chart Grid */}
+                            <div className="relative pt-4 pb-2">
+                              {/* X-Axis Grid Lines */}
+                              <div className="absolute inset-0 grid grid-cols-10 pointer-events-none pl-20 pr-4">
+                                {Array.from({ length: 11 }).map((_, idx) => (
+                                  <div key={idx} className="border-r border-slate-200 h-full first:border-l"></div>
+                                ))}
                               </div>
-                              <div className="col-span-12 md:col-span-8">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1 bg-slate-200 rounded-full h-4 overflow-hidden shadow-inner">
-                                    <div 
-                                      className={`h-full rounded-full ${pct > 80 ? 'bg-emerald-600' : pct > 50 ? 'bg-blue-700' : 'bg-amber-500'}`}
-                                      style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
-                                    ></div>
+
+                              <div className="space-y-3 relative z-10">
+                                {monthsData.map((row, idx) => (
+                                  <div key={idx} className="grid grid-cols-12 items-center gap-2">
+                                    <div className="col-span-2 text-xs font-bold text-slate-700 text-right pr-2 font-mono">{row.month}</div>
+                                    <div className="col-span-10">
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex-1 bg-slate-100 h-7 rounded overflow-hidden flex border border-slate-200 shadow-inner">
+                                          <div className="bg-[#1976d2] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.a * 2.2}%` }} title={`A - Financial Stewardship (10%): ${row.a}%`}>{row.a > 2 ? 'A' : ''}</div>
+                                          <div className="bg-[#f97316] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.b * 2.2}%` }} title={`B - Service Delivery (15%): ${row.b}%`}>{row.b > 2 ? 'B' : ''}</div>
+                                          <div className="bg-[#40B5AD] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.c * 2.2}%` }} title={`C - Core Mandate (65%): ${row.c}%`}>{row.c > 5 ? 'C' : ''}</div>
+                                          <div className="bg-[#8b5cf6] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.d * 2.2}%` }} title={`D - Presidential Directives (2%): ${row.d}%`}></div>
+                                          <div className="bg-[#ec4899] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.e * 2.2}%` }} title={`E - Affirmative Action (4%): ${row.e}%`}></div>
+                                          <div className="bg-[#6b7280] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.f * 2.2}%` }} title={`F - Cross-Cutting (4%): ${row.f}%`}></div>
+                                        </div>
+                                        <span className="font-mono font-black text-xs text-slate-900 w-14">{row.total}%</span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <span className="font-mono font-black text-xs text-slate-800 w-12 text-right">{pct}%</span>
+                                ))}
+                              </div>
+
+                              {/* X-Axis Ticks */}
+                              <div className="grid grid-cols-11 text-[10px] text-slate-500 font-mono pt-2 pl-20 pr-4 text-center">
+                                <div>0%</div>
+                                <div>10%</div>
+                                <div>20%</div>
+                                <div>30%</div>
+                                <div>40%</div>
+                                <div>50%</div>
+                                <div>60%</div>
+                                <div>70%</div>
+                                <div>80%</div>
+                                <div>90%</div>
+                                <div>100%</div>
+                              </div>
+                              <div className="text-center text-[11px] font-bold text-slate-600 mt-1">
+                                Overall progress (% — percentage points contributed by each KPI category)
+                              </div>
+                            </div>
+
+                            {/* Legend (6 Categories summing to 100%) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-[11px]">
+                              <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded bg-[#1976d2] shrink-0"></span>
+                                <div>
+                                  <div className="font-bold text-slate-800">A - Financial Stewardship (10%)</div>
+                                  <div className="text-slate-500 text-[10px]">Weight: 10 · Contribution to progress</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded bg-[#f97316] shrink-0"></span>
+                                <div>
+                                  <div className="font-bold text-slate-800">B - Service Delivery (15%)</div>
+                                  <div className="text-slate-500 text-[10px]">Weight: 15 · Contribution to progress</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded bg-[#40B5AD] shrink-0"></span>
+                                <div>
+                                  <div className="font-bold text-slate-800">C - Core Mandate (65%)</div>
+                                  <div className="text-slate-500 text-[10px]">Weight: 65 · Contribution to progress</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded bg-[#8b5cf6] shrink-0"></span>
+                                <div>
+                                  <div className="font-bold text-slate-800">D - Presidential Directives (2%)</div>
+                                  <div className="text-slate-500 text-[10px]">Weight: 2 · Contribution to progress</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded bg-[#ec4899] shrink-0"></span>
+                                <div>
+                                  <div className="font-bold text-slate-800">E - Affirmative Action (4%)</div>
+                                  <div className="text-slate-500 text-[10px]">Weight: 4 · Contribution to progress</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded bg-[#6b7280] shrink-0"></span>
+                                <div>
+                                  <div className="font-bold text-slate-800">F - Cross-Cutting (4%)</div>
+                                  <div className="text-slate-500 text-[10px]">Weight: 4 · Total Weight: 100%</div>
                                 </div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

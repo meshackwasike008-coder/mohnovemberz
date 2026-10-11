@@ -1499,3 +1499,30 @@ export const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
     timestamp: "2026-03-24 13:10:02"
   }
 ];
+
+export interface ProjectMonthlyProgress {
+  id: number;
+  project_id: number;
+  year_month: string;
+  target_pct: number;
+  achieved_pct: number;
+  kpi_code?: string;
+  kpi_name?: string;
+  kpi_target?: number;
+  kpi_achieved?: number;
+  kpi_unit?: string;
+  remarks?: string;
+}
+
+export const INITIAL_MONTHLY_PROGRESS: ProjectMonthlyProgress[] = [
+  { id: 1, project_id: 9, year_month: 'Jan 2026', target_pct: 38.0, achieved_pct: 37.7, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'Jan 2026 baseline evaluation' },
+  { id: 2, project_id: 9, year_month: 'Feb 2026', target_pct: 39.0, achieved_pct: 38.3, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'Feb 2026 progress update' },
+  { id: 3, project_id: 9, year_month: 'Mar 2026', target_pct: 40.0, achieved_pct: 39.0, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'Q3 audit verification' },
+  { id: 4, project_id: 9, year_month: 'Apr 2026', target_pct: 40.5, achieved_pct: 39.5, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'April milestone review' },
+  { id: 5, project_id: 9, year_month: 'May 2026', target_pct: 41.0, achieved_pct: 40.0, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'May progress check' },
+  { id: 6, project_id: 9, year_month: 'Jun 2026', target_pct: 41.5, achieved_pct: 40.5, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'Mid-year performance evaluation' },
+  { id: 7, project_id: 9, year_month: 'Jul 2026', target_pct: 42.0, achieved_pct: 40.9, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'Q1 2026/27 review' },
+  { id: 8, project_id: 9, year_month: 'Aug 2026', target_pct: 42.5, achieved_pct: 41.3, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'August monitoring report' },
+  { id: 9, project_id: 9, year_month: 'Sep 2026', target_pct: 43.0, achieved_pct: 41.8, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'September update' },
+  { id: 10, project_id: 9, year_month: 'Oct 2026', target_pct: 43.5, achieved_pct: 41.9, kpi_code: 'A,B,C,D', kpi_name: 'Composite KPI Contribution', remarks: 'October active cycle' },
+];
