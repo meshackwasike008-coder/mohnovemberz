@@ -119,6 +119,28 @@ export default function App() {
   const [ganttSelectedSaga, setGanttSelectedSaga] = useState<string>('Kenyatta National Hospital');
   const [selectedDirectorateForDivisions, setSelectedDirectorateForDivisions] = useState<string | null>(null);
 
+  const matchSagaFilter = (projectSaga: string | undefined, filterSaga: string) => {
+    if (filterSaga === 'All') return true;
+    if (!projectSaga) return false;
+    if (projectSaga === filterSaga) return true;
+    const p = projectSaga.toLowerCase();
+    const f = filterSaga.toLowerCase();
+    if (p === f) return true;
+    if (f.includes('knh') && p.includes('kenyatta national hospital')) return true;
+    if (f.includes('mtrh') && p.includes('moi teaching')) return true;
+    if (f.includes('kemsa') && p.includes('kemsa')) return true;
+    if (f.includes('kutrrh') && p.includes('kutrrh')) return true;
+    if (f.includes('mathari') && p.includes('mathari')) return true;
+    if (f.includes('jootrh') && p.includes('jootrh')) return true;
+    if (f.includes('knbts') && p.includes('blood transfusion')) return true;
+    if (f.includes('kemri') && p.includes('research institute')) return true;
+    if (f.includes('ncik') && p.includes('cancer institute')) return true;
+    if (f.includes('nsdcc') && p.includes('syndemic')) return true;
+    if (f.includes('nsirh') && p.includes('spinal injury')) return true;
+    if (f.includes('mkrh') && p.includes('mwai kibaki')) return true;
+    return false;
+  };
+
   const toggleProgramme = (id: number) => {
     setExpandedProgrammes(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -696,7 +718,7 @@ export default function App() {
                     <tbody className="divide-y divide-slate-100">
                       {(() => {
                         const filtered = projects.filter(p => {
-                          if (dashFilterSaga !== 'All' && p.saga_name !== dashFilterSaga) return false;
+                          if (!matchSagaFilter(p.saga_name, dashFilterSaga)) return false;
                           if (dashFilterDirectorate !== 'All' && p.directorate_name !== dashFilterDirectorate) return false;
                           if (dashFilterDeliveryUnit !== 'All' && p.delivery_unit !== dashFilterDeliveryUnit) return false;
                           if (dashFilterDivision !== 'All' && p.division_name !== dashFilterDivision) return false;
@@ -2185,196 +2207,6 @@ export default function App() {
                         </div>
                       )}
                     </div>
-
-                    {/* Gantt Chart / Performance Graph with Toggle ('All Projects', 'Selected Directorate', 'Sagas') */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-3">
-                        <div className="flex items-center gap-2">
-                          <Milestone className="w-5 h-5 text-blue-700" />
-                          <h3 className="text-sm font-black text-slate-900">Overall Project Progress by Month — KPI Contribution</h3>
-                        </div>
-
-                        {/* Toggle Bar */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-bold border border-slate-200">
-                            <button
-                              onClick={() => setGanttDisplayMode('all')}
-                              className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'all' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
-                            >
-                              All Projects
-                            </button>
-                            <button
-                              onClick={() => setGanttDisplayMode('directorate')}
-                              className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'directorate' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
-                            >
-                              Selected Directorate
-                            </button>
-                            <button
-                              onClick={() => setGanttDisplayMode('saga')}
-                              className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'saga' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
-                            >
-                              SAGAs
-                            </button>
-                          </div>
-
-                          {ganttDisplayMode === 'directorate' && (
-                            <select
-                              value={ganttSelectedDirectorate}
-                              onChange={(e) => setGanttSelectedDirectorate(e.target.value)}
-                              className="bg-slate-50 border border-slate-300 rounded p-1.5 text-xs font-semibold text-slate-800"
-                            >
-                              {Array.from(new Set(projects.filter(p => p.directorate_name).map(p => p.directorate_name))).map(d => (
-                                <option key={d} value={d}>{d}</option>
-                              ))}
-                            </select>
-                          )}
-
-                          {ganttDisplayMode === 'saga' && (
-                            <select
-                              value={ganttSelectedSaga}
-                              onChange={(e) => setGanttSelectedSaga(e.target.value)}
-                              className="bg-slate-50 border border-slate-300 rounded p-1.5 text-xs font-semibold text-slate-800"
-                            >
-                              {Array.from(new Set(projects.filter(p => p.saga_name).map(p => p.saga_name))).map(s => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Stacked Gantt Chart matching graph.png layout */}
-                      {(() => {
-                        let targetProjects = projects;
-                        if (ganttDisplayMode === 'directorate') {
-                          targetProjects = projects.filter(p => p.directorate_name === ganttSelectedDirectorate);
-                        } else if (ganttDisplayMode === 'saga') {
-                          targetProjects = projects.filter(p => p.saga_name === ganttSelectedSaga);
-                        }
-                        const avgPct = targetProjects.length > 0 ? targetProjects.reduce((acc, p) => acc + getProjectCalculatedProgress(p, kpis).pct, 0) / targetProjects.length : 40;
-                        const factor = avgPct / 41.3;
-
-                        const baseTotals = [41.3, 40.9, 40.5, 40.0, 39.5, 39.0, 38.3, 37.7];
-                        const monthLabels = ['Aug 2026', 'Jul 2026', 'Jun 2026', 'May 2026', 'Apr 2026', 'Mar 2026', 'Feb 2026', 'Jan 2026'];
-                        
-                        const monthsData = baseTotals.map((tot, idx) => {
-                          const total = Number((tot * (avgPct / 41.3)).toFixed(1));
-                          return {
-                            month: monthLabels[idx],
-                            a: Number((total * 0.10).toFixed(1)), // 10%
-                            b: Number((total * 0.15).toFixed(1)), // 15%
-                            c: Number((total * 0.65).toFixed(1)), // 65%
-                            d: Number((total * 0.02).toFixed(1)), // 2%
-                            e: Number((total * 0.04).toFixed(1)), // 4%
-                            f: Number((total * 0.04).toFixed(1)), // 4%
-                            total
-                          };
-                        });
-
-                        return (
-                          <div className="space-y-4 pt-2">
-                            <div className="text-xs font-bold text-slate-600">
-                              Showing {targetProjects.length} project(s) for <strong>{ganttDisplayMode === 'all' ? 'All Projects' : ganttDisplayMode === 'directorate' ? ganttSelectedDirectorate : ganttSelectedSaga}</strong>
-                            </div>
-
-                            {/* Chart Grid */}
-                            <div className="relative pt-4 pb-2">
-                              {/* X-Axis Grid Lines */}
-                              <div className="absolute inset-0 grid grid-cols-10 pointer-events-none pl-20 pr-4">
-                                {Array.from({ length: 11 }).map((_, idx) => (
-                                  <div key={idx} className="border-r border-slate-200 h-full first:border-l"></div>
-                                ))}
-                              </div>
-
-                              <div className="space-y-3 relative z-10">
-                                {monthsData.map((row, idx) => (
-                                  <div key={idx} className="grid grid-cols-12 items-center gap-2">
-                                    <div className="col-span-2 text-xs font-bold text-slate-700 text-right pr-2 font-mono">{row.month}</div>
-                                    <div className="col-span-10">
-                                      <div className="flex items-center gap-2">
-                                        <div className="flex-1 bg-slate-100 h-7 rounded overflow-hidden flex border border-slate-200 shadow-inner">
-                                          <div className="bg-[#1976d2] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.a * 2.2}%` }} title={`A - Financial Stewardship (10%): ${row.a}%`}>{row.a > 2 ? 'A' : ''}</div>
-                                          <div className="bg-[#f97316] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.b * 2.2}%` }} title={`B - Service Delivery (15%): ${row.b}%`}>{row.b > 2 ? 'B' : ''}</div>
-                                          <div className="bg-[#40B5AD] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.c * 2.2}%` }} title={`C - Core Mandate (65%): ${row.c}%`}>{row.c > 5 ? 'C' : ''}</div>
-                                          <div className="bg-[#8b5cf6] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.d * 2.2}%` }} title={`D - Presidential Directives (2%): ${row.d}%`}></div>
-                                          <div className="bg-[#ec4899] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.e * 2.2}%` }} title={`E - Affirmative Action (4%): ${row.e}%`}></div>
-                                          <div className="bg-[#6b7280] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.f * 2.2}%` }} title={`F - Cross-Cutting (4%): ${row.f}%`}></div>
-                                        </div>
-                                        <span className="font-mono font-black text-xs text-slate-900 w-14">{row.total}%</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* X-Axis Ticks */}
-                              <div className="grid grid-cols-11 text-[10px] text-slate-500 font-mono pt-2 pl-20 pr-4 text-center">
-                                <div>0%</div>
-                                <div>10%</div>
-                                <div>20%</div>
-                                <div>30%</div>
-                                <div>40%</div>
-                                <div>50%</div>
-                                <div>60%</div>
-                                <div>70%</div>
-                                <div>80%</div>
-                                <div>90%</div>
-                                <div>100%</div>
-                              </div>
-                              <div className="text-center text-[11px] font-bold text-slate-600 mt-1">
-                                Overall progress (% — percentage points contributed by each KPI category)
-                              </div>
-                            </div>
-
-                            {/* Legend (6 Categories summing to 100%) */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-[11px]">
-                              <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded bg-[#1976d2] shrink-0"></span>
-                                <div>
-                                  <div className="font-bold text-slate-800">A - Financial Stewardship (10%)</div>
-                                  <div className="text-slate-500 text-[10px]">Weight: 10 · Contribution to progress</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded bg-[#f97316] shrink-0"></span>
-                                <div>
-                                  <div className="font-bold text-slate-800">B - Service Delivery (15%)</div>
-                                  <div className="text-slate-500 text-[10px]">Weight: 15 · Contribution to progress</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded bg-[#40B5AD] shrink-0"></span>
-                                <div>
-                                  <div className="font-bold text-slate-800">C - Core Mandate (65%)</div>
-                                  <div className="text-slate-500 text-[10px]">Weight: 65 · Contribution to progress</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded bg-[#8b5cf6] shrink-0"></span>
-                                <div>
-                                  <div className="font-bold text-slate-800">D - Presidential Directives (2%)</div>
-                                  <div className="text-slate-500 text-[10px]">Weight: 2 · Contribution to progress</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded bg-[#ec4899] shrink-0"></span>
-                                <div>
-                                  <div className="font-bold text-slate-800">E - Affirmative Action (4%)</div>
-                                  <div className="text-slate-500 text-[10px]">Weight: 4 · Contribution to progress</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded bg-[#6b7280] shrink-0"></span>
-                                <div>
-                                  <div className="font-bold text-slate-800">F - Cross-Cutting (4%)</div>
-                                  <div className="text-slate-500 text-[10px]">Weight: 4 · Total Weight: 100%</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
                   </div>
                 )}
               </div>
@@ -3591,6 +3423,196 @@ export default function App() {
                     )}
                   </table>
                 </div>
+              </div>
+
+              {/* Overall Project Progress by Month — KPI Contribution Gantt Chart */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Milestone className="w-5 h-5 text-blue-700" />
+                    <h3 className="text-sm font-black text-slate-900">Overall Project Progress by Month — KPI Contribution</h3>
+                  </div>
+
+                  {/* Toggle Bar */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-bold border border-slate-200">
+                      <button
+                        onClick={() => setGanttDisplayMode('all')}
+                        className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'all' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
+                      >
+                        All Projects
+                      </button>
+                      <button
+                        onClick={() => setGanttDisplayMode('directorate')}
+                        className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'directorate' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
+                      >
+                        Selected Directorate
+                      </button>
+                      <button
+                        onClick={() => setGanttDisplayMode('saga')}
+                        className={`px-3 py-1.5 rounded-md transition ${ganttDisplayMode === 'saga' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'}`}
+                      >
+                        SAGAs
+                      </button>
+                    </div>
+
+                    {ganttDisplayMode === 'directorate' && (
+                      <select
+                        value={ganttSelectedDirectorate}
+                        onChange={(e) => setGanttSelectedDirectorate(e.target.value)}
+                        className="bg-slate-50 border border-slate-300 rounded p-1.5 text-xs font-semibold text-slate-800"
+                      >
+                        {Array.from(new Set(projects.filter(p => p.directorate_name).map(p => p.directorate_name))).map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    )}
+
+                    {ganttDisplayMode === 'saga' && (
+                      <select
+                        value={ganttSelectedSaga}
+                        onChange={(e) => setGanttSelectedSaga(e.target.value)}
+                        className="bg-slate-50 border border-slate-300 rounded p-1.5 text-xs font-semibold text-slate-800"
+                      >
+                        {Array.from(new Set(projects.filter(p => p.saga_name).map(p => p.saga_name))).map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {/* Stacked Gantt Chart matching graph.png layout */}
+                {(() => {
+                  let targetProjects = projects;
+                  if (ganttDisplayMode === 'directorate') {
+                    targetProjects = projects.filter(p => p.directorate_name === ganttSelectedDirectorate);
+                  } else if (ganttDisplayMode === 'saga') {
+                    targetProjects = projects.filter(p => p.saga_name === ganttSelectedSaga);
+                  }
+                  const avgPct = targetProjects.length > 0 ? targetProjects.reduce((acc, p) => acc + getProjectCalculatedProgress(p, kpis).pct, 0) / targetProjects.length : 40;
+                  const factor = avgPct / 41.3;
+
+                  const baseTotals = [41.3, 40.9, 40.5, 40.0, 39.5, 39.0, 38.3, 37.7];
+                  const monthLabels = ['Aug 2026', 'Jul 2026', 'Jun 2026', 'May 2026', 'Apr 2026', 'Mar 2026', 'Feb 2026', 'Jan 2026'];
+                  
+                  const monthsData = baseTotals.map((tot, idx) => {
+                    const total = Number((tot * (avgPct / 41.3)).toFixed(1));
+                    return {
+                      month: monthLabels[idx],
+                      a: Number((total * 0.10).toFixed(1)), // 10%
+                      b: Number((total * 0.15).toFixed(1)), // 15%
+                      c: Number((total * 0.65).toFixed(1)), // 65%
+                      d: Number((total * 0.02).toFixed(1)), // 2%
+                      e: Number((total * 0.04).toFixed(1)), // 4%
+                      f: Number((total * 0.04).toFixed(1)), // 4%
+                      total
+                    };
+                  });
+
+                  return (
+                    <div className="space-y-4 pt-2">
+                      <div className="text-xs font-bold text-slate-600">
+                        Showing {targetProjects.length} project(s) for <strong>{ganttDisplayMode === 'all' ? 'All Projects' : ganttDisplayMode === 'directorate' ? ganttSelectedDirectorate : ganttSelectedSaga}</strong>
+                      </div>
+
+                      {/* Chart Grid */}
+                      <div className="relative pt-4 pb-2">
+                        {/* X-Axis Grid Lines */}
+                        <div className="absolute inset-0 grid grid-cols-10 pointer-events-none pl-20 pr-4">
+                          {Array.from({ length: 11 }).map((_, idx) => (
+                            <div key={idx} className="border-r border-slate-200 h-full first:border-l"></div>
+                          ))}
+                        </div>
+
+                        <div className="space-y-3 relative z-10">
+                          {monthsData.map((row, idx) => (
+                            <div key={idx} className="grid grid-cols-12 items-center gap-2">
+                              <div className="col-span-2 text-xs font-bold text-slate-700 text-right pr-2 font-mono">{row.month}</div>
+                              <div className="col-span-10">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 bg-slate-100 h-7 rounded overflow-hidden flex border border-slate-200 shadow-inner">
+                                    <div className="bg-[#1976d2] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.a * 2.2}%` }} title={`A - Financial Stewardship (10%): ${row.a}%`}>{row.a > 2 ? 'A' : ''}</div>
+                                    <div className="bg-[#f97316] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.b * 2.2}%` }} title={`B - Service Delivery (15%): ${row.b}%`}>{row.b > 2 ? 'B' : ''}</div>
+                                    <div className="bg-[#40B5AD] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.c * 2.2}%` }} title={`C - Core Mandate (65%): ${row.c}%`}>{row.c > 5 ? 'C' : ''}</div>
+                                    <div className="bg-[#8b5cf6] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.d * 2.2}%` }} title={`D - Presidential Directives (2%): ${row.d}%`}></div>
+                                    <div className="bg-[#ec4899] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.e * 2.2}%` }} title={`E - Affirmative Action (4%): ${row.e}%`}></div>
+                                    <div className="bg-[#6b7280] h-full flex items-center justify-center text-[9px] text-white font-bold" style={{ width: `${row.f * 2.2}%` }} title={`F - Cross-Cutting (4%): ${row.f}%`}></div>
+                                  </div>
+                                  <span className="font-mono font-black text-xs text-slate-900 w-14">{row.total}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* X-Axis Ticks */}
+                        <div className="grid grid-cols-11 text-[10px] text-slate-500 font-mono pt-2 pl-20 pr-4 text-center">
+                          <div>0%</div>
+                          <div>10%</div>
+                          <div>20%</div>
+                          <div>30%</div>
+                          <div>40%</div>
+                          <div>50%</div>
+                          <div>60%</div>
+                          <div>70%</div>
+                          <div>80%</div>
+                          <div>90%</div>
+                          <div>100%</div>
+                        </div>
+                        <div className="text-center text-[11px] font-bold text-slate-600 mt-1">
+                          Overall progress (% — percentage points contributed by each KPI category)
+                        </div>
+                      </div>
+
+                      {/* Legend (6 Categories summing to 100%) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-[11px]">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[#1976d2] shrink-0"></span>
+                          <div>
+                            <div className="font-bold text-slate-800">A - Financial Stewardship (10%)</div>
+                            <div className="text-slate-500 text-[10px]">Weight: 10 · Contribution to progress</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[#f97316] shrink-0"></span>
+                          <div>
+                            <div className="font-bold text-slate-800">B - Service Delivery (15%)</div>
+                            <div className="text-slate-500 text-[10px]">Weight: 15 · Contribution to progress</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[#40B5AD] shrink-0"></span>
+                          <div>
+                            <div className="font-bold text-slate-800">C - Core Mandate (65%)</div>
+                            <div className="text-slate-500 text-[10px]">Weight: 65 · Contribution to progress</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[#8b5cf6] shrink-0"></span>
+                          <div>
+                            <div className="font-bold text-slate-800">D - Presidential Directives (2%)</div>
+                            <div className="text-slate-500 text-[10px]">Weight: 2 · Contribution to progress</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[#ec4899] shrink-0"></span>
+                          <div>
+                            <div className="font-bold text-slate-800">E - Affirmative Action (4%)</div>
+                            <div className="text-slate-500 text-[10px]">Weight: 4 · Contribution to progress</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded bg-[#6b7280] shrink-0"></span>
+                          <div>
+                            <div className="font-bold text-slate-800">F - Cross-Cutting (4%)</div>
+                            <div className="text-slate-500 text-[10px]">Weight: 4 · Total Weight: 100%</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
