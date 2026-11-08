@@ -141,6 +141,7 @@ export interface SystemUser {
   can_approve: boolean;
   can_download: boolean;
   is_admin: boolean;
+  last_login: string;
 }
 
 export const INITIAL_FLAGSHIPS: Flagship[] = [
@@ -1508,7 +1509,8 @@ export const INITIAL_USERS: SystemUser[] = [
     can_edit: true,
     can_approve: true,
     can_download: true,
-    is_admin: true
+    is_admin: true,
+    last_login: "2026-02-14 08:12:45"
   },
   {
     id: 2,
@@ -1521,7 +1523,8 @@ export const INITIAL_USERS: SystemUser[] = [
     can_edit: true,
     can_approve: true,
     can_download: true,
-    is_admin: false
+    is_admin: false,
+    last_login: "2026-02-14 07:45:10"
   },
   {
     id: 3,
@@ -1534,7 +1537,8 @@ export const INITIAL_USERS: SystemUser[] = [
     can_edit: true,
     can_approve: false,
     can_download: true,
-    is_admin: false
+    is_admin: false,
+    last_login: "2026-02-14 07:45:10"
   },
   {
     id: 4,
@@ -1547,7 +1551,23 @@ export const INITIAL_USERS: SystemUser[] = [
     can_edit: false,
     can_approve: false,
     can_download: true,
-    is_admin: false
+    is_admin: false,
+    last_login: "2026-02-14 07:45:10"
+  }
+  ,
+  {
+    id: 5,
+    full_name: "Dr. Harry Kimtai",
+    email: "ps@health.go.ke",
+    role: "Principal Secretary (PS-SDMS)",
+    directorate: "Executive Office of the Principal Secretary",
+    is_active: true,
+    can_upload: true,
+    can_edit: true,
+    can_approve: true,
+    can_download: true,
+    is_admin: true,
+    last_login: "2026-02-14 06:58:02"
   }
 ];
 
