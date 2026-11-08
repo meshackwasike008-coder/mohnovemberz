@@ -48,14 +48,15 @@ CREATE TABLE users (
   can_download BOOLEAN DEFAULT TRUE,
   is_admin BOOLEAN DEFAULT FALSE,
   last_login DATETIME NULL,
+  password_hash VARCHAR(255) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO users (id, full_name, email, role, directorate, is_active, can_upload, can_edit, can_approve, can_download, is_admin, last_login) VALUES
-(1, 'Dr. Harry Kimtai', 'harry.kimtai@health.go.ke', 'Principal Secretary - SDMS', 'Executive Office', 1, 1, 1, 1, 1, 1, '2026-02-14 06:58:02'),
-(2, 'Dr. Patrick Amoth', 'patrick.amoth@health.go.ke', 'Director General for Health', 'Directorate General', 1, 1, 1, 1, 1, 1, '2026-02-14 07:45:10'),
-(3, 'Dr. Rose Njeru', 'rose.njeru@health.go.ke', 'Head of Health Informatics', 'Health Informatics Directorate', 1, 1, 1, 1, 1, 0, '2026-02-14 08:12:45'),
-(4, 'CPA Evanson Kamuri', 'evanson.kamuri@knh.or.ke', 'Chief Executive Officer', 'Kenyatta National Hospital', 1, 1, 1, 0, 1, 0, '2026-02-14 07:45:10');
+INSERT INTO users (id, full_name, email, role, directorate, is_active, can_upload, can_edit, can_approve, can_download, is_admin, last_login, password_hash) VALUES
+(1, 'Dr. Harry Kimtai', 'harry.kimtai@health.go.ke', 'Principal Secretary - SDMS', 'Executive Office', 1, 1, 1, 1, 1, 1, '2026-02-14 06:58:02', '$2y$10$A1aqO4WqUN1yF9qlTJPHAeFyeYStY8jf1cO2q1tC9QVr.SsJBqbq.'),
+(2, 'Dr. Patrick Amoth', 'patrick.amoth@health.go.ke', 'Director General for Health', 'Directorate General', 1, 1, 1, 1, 1, 1, '2026-02-14 07:45:10', '$2y$10$A1aqO4WqUN1yF9qlTJPHAeFyeYStY8jf1cO2q1tC9QVr.SsJBqbq.'),
+(3, 'Dr. Rose Njeru', 'rose.njeru@health.go.ke', 'Head of Health Informatics', 'Health Informatics Directorate', 1, 1, 1, 1, 1, 0, '2026-02-14 08:12:45', '$2y$10$A1aqO4WqUN1yF9qlTJPHAeFyeYStY8jf1cO2q1tC9QVr.SsJBqbq.'),
+(4, 'CPA Evanson Kamuri', 'evanson.kamuri@knh.or.ke', 'Chief Executive Officer', 'Kenyatta National Hospital', 1, 1, 1, 0, 1, 0, '2026-02-14 07:45:10', '$2y$10$A1aqO4WqUN1yF9qlTJPHAeFyeYStY8jf1cO2q1tC9QVr.SsJBqbq.');
 
 -- 2. SAGAS TABLE
 CREATE TABLE sagas (

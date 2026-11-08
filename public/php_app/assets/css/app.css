@@ -1,0 +1,149 @@
+/* ============================================================
+   PP-SDOMS — native PHP edition styles
+   ============================================================ */
+:root {
+    --brand-900: #0a2356;
+    --brand-800: #0d3b82;
+    --brand-700: #0d47a1;
+    --teal: #40b5ad;
+}
+
+body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ---------- Sticky header ---------- */
+.app-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 6px 20px rgba(10, 35, 86, 0.18);
+}
+.app-header-bar {
+    background: linear-gradient(90deg, var(--brand-900) 0%, var(--brand-800) 45%, var(--brand-700) 100%);
+    color: #fff;
+}
+.coat-wrap {
+    width: 44px; height: 44px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 3px;
+}
+.coat-svg { width: 100%; height: 100%; }
+
+.app-nav {
+    background: #ffffff;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid #e2e8f0;
+}
+.nav-link {
+    display: inline-block;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #475569;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all .15s ease;
+}
+.nav-link:hover { color: #0d47a1; background: #f1f5f9; }
+.nav-link.active { color: #0d47a1; border-bottom-color: #0d47a1; background: #eff6ff; }
+
+/* ---------- Notification dropdown ---------- */
+.notif-menu {
+    position: absolute;
+    right: 0;
+    top: 46px;
+    width: 340px;
+    max-width: calc(100vw - 24px);
+    background: #fff;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+    overflow: hidden;
+    z-index: 60;
+}
+.notif-item { display: block; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.notif-item:hover { background: #f8fafc; }
+.notif-item.is-read { opacity: 0.55; background: #f8fafc; }
+.notif-item.is-unread { background: #fff; }
+
+/* ---------- Cards & tables ---------- */
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+.card-pad { padding: 18px; }
+.section-title { font-size: 15px; font-weight: 900; color: #0f172a; letter-spacing: -0.01em; }
+.muted { color: #64748b; }
+.table-wrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.data thead th {
+    background: #f8fafc; color: #475569; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .04em; font-size: 10px; padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+}
+table.data tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+table.data tbody tr:hover { background: #f8fafc; }
+.num { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+/* ---------- Buttons ---------- */
+.btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; padding: 8px 14px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; transition: all .15s ease; }
+.btn-primary { background: #0d47a1; color: #fff; }
+.btn-primary:hover { background: #0a3a86; }
+.btn-ghost { background: #fff; color: #334155; border-color: #cbd5e1; }
+.btn-ghost:hover { background: #f1f5f9; }
+.btn-teal { background: var(--teal); color: #fff; }
+.btn-teal:hover { filter: brightness(0.94); }
+.btn-danger { background: #dc2626; color: #fff; }
+.btn-danger:hover { background: #b91c1c; }
+.btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 7px; }
+
+/* ---------- Badges / progress ---------- */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.progress-track { width: 100%; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 999px; background: var(--teal); }
+
+/* ---------- Tabs ---------- */
+.tab-strip { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; }
+.tab-link { padding: 10px 16px; font-size: 12px; font-weight: 800; color: #64748b; border-bottom: 2px solid transparent; }
+.tab-link:hover { color: #0d47a1; }
+.tab-link.active { color: #0d47a1; border-bottom-color: #0d47a1; }
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px; z-index: 100; overflow-y: auto;
+}
+.modal-backdrop.hidden { display: none; }
+.modal-panel {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 560px;
+    box-shadow: 0 30px 70px rgba(2, 6, 23, 0.35); overflow: hidden;
+}
+.modal-panel.modal-sm { max-width: 430px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #e2e8f0; }
+.modal-body { padding: 18px; }
+.modal-foot { padding: 14px 18px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px; background: #f8fafc; }
+
+/* ---------- Forms ---------- */
+label.fld { display: block; font-size: 11px; font-weight: 800; color: #334155; margin-bottom: 4px; }
+input.inp, select.inp, textarea.inp {
+    width: 100%; font-size: 12px; padding: 8px 10px; border: 1px solid #cbd5e1;
+    border-radius: 8px; background: #fff; color: #0f172a; outline: none;
+}
+input.inp:focus, select.inp:focus, textarea.inp:focus { border-color: #0d47a1; box-shadow: 0 0 0 3px rgba(13,71,161,0.12); }
+
+/* ---------- Flash ---------- */
+.flash { padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+.flash-ok { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.flash-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+/* ---------- Project title link tooltip ---------- */
+.proj-link { position: relative; display: inline-block; color: #0d47a1; font-weight: 700; text-decoration: none; }
+.proj-link:hover { text-decoration: underline; }
+.proj-link[data-hint]:hover::after {
+    content: attr(data-hint);
+    position: absolute; left: 0; top: 100%; margin-top: 4px;
+    background: #0f172a; color: #fff; font-size: 10px; font-weight: 600;
+    padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 40;
+}

@@ -1,0 +1,40 @@
+# PP-SDOMS — Apache configuration (cPanel friendly)
+Options -Indexes
+DirectoryIndex index.php
+
+# Pretty URLs: /projects -> index.php?page=projects
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Never rewrite real files/directories
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Map /page-name to the front controller
+    RewriteRule ^([a-z0-9\-]+)/?$ index.php?page=$1 [L,QSA]
+</IfModule>
+
+# Protect sensitive folders and files
+<FilesMatch "^(config\.php|db\.php|schema\.sql)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteRule ^(includes|database)/ - [F,L]
+</IfModule>
+
+# Basic hardening
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+# Cache static assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>
