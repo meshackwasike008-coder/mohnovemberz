@@ -1,16 +1,21 @@
 -- =========================================================================
 -- STATE DEPARTMENT FOR MEDICAL SERVICES - PP-SDOMS
--- STANDALONE PHP & MYSQL DATABASE SCHEMA (cPANEL DEPLOYMENT)
+-- STANDALONE PHP & MYSQL DATABASE SCHEMA & DEMO DATA (cPANEL DEPLOYMENT)
+-- FY 2026/27 Live Schema with Migration 002 Mock Data
 -- =========================================================================
 
+SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS monthly_kpi_progress;
+DROP TABLE IF EXISTS project_monthly_progress;
+DROP TABLE IF EXISTS project_kpis;
+DROP TABLE IF EXISTS sub_programmes;
 DROP TABLE IF EXISTS audit_logs;
 DROP TABLE IF EXISTS reports;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS action_points;
 DROP TABLE IF EXISTS meetings;
+DROP TABLE IF EXISTS performance_contracts;
 DROP TABLE IF EXISTS performance_kpis;
 DROP TABLE IF EXISTS projects;
 DROP TABLE IF EXISTS flagships;
@@ -56,7 +61,8 @@ INSERT INTO sagas (id, saga_code, saga_name, head_name, budget_allocated) VALUES
 (1, 'KNH', 'Kenyatta National Hospital', 'Dr. Evanson Kamuri', 12500000000.00),
 (2, 'MTRH', 'Moi Teaching and Referral Hospital', 'Dr. Wilson Aruasa', 9800000000.00),
 (3, 'KEMSA', 'Kenya Medical Supplies Authority', 'Dr. Andrew Mulwa', 7500000000.00),
-(4, 'KUTRRH', 'Kenyatta University Teaching, Referral & Research Hospital', 'Dr. Ahmed Dagane', 8200000000.00);
+(4, 'KUTRRH', 'Kenyatta University Teaching, Referral & Research Hospital', 'Dr. Ahmed Dagane', 8200000000.00),
+(8, 'JOOTRH', 'Jaramogi Oginga Odinga Teaching and Referral Hospital', 'Dr. Richard Olwande', 6500000000.00);
 
 -- 3. DIRECTORATES TABLE
 CREATE TABLE directorates (
@@ -71,7 +77,8 @@ INSERT INTO directorates (id, directorate_code, directorate_name, lead_officer, 
 (1, 'DIR_FH', 'Directorate for Family Health', 'Dr. Ruth Masha', 14200000000.00),
 (2, 'DIR_PC', 'Directorate for Preventive & Promotive Health', 'Dr. Sultani Matendechero', 16800000000.00),
 (3, 'DIR_CS', 'Directorate for Curative & Rehabilitation Services', 'Dr. Simon Kibias', 22100000000.00),
-(4, 'DIR_HI', 'Health Informatics & Digital Health Directorate', 'Dr. Rose Njeru', 8500000000.00);
+(4, 'DIR_HI', 'Health Informatics & Digital Health Directorate', 'Dr. Rose Njeru', 8500000000.00),
+(5, 'DIR_NBTS', 'Directorate for Kenya National Blood Tissues & Transfusion Services', 'Dr. Winifred Ndagi', 4500000000.00);
 
 -- 4. DIVISIONS TABLE
 CREATE TABLE divisions (
@@ -114,11 +121,17 @@ INSERT INTO flagships (id, title, description, lead_directorate, progress_pct, p
 -- 6. PROJECTS TABLE
 CREATE TABLE projects (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  project_code VARCHAR(50) UNIQUE,
   programme_title VARCHAR(250) NOT NULL,
   sub_programme VARCHAR(250) NOT NULL,
   description TEXT,
   remarks TEXT,
+  location VARCHAR(150),
+  type VARCHAR(50) DEFAULT 'Project',
   category VARCHAR(50) DEFAULT 'Directorate',
+  directorate_id INT,
+  saga_id INT,
+  division_id INT,
   directorate_name VARCHAR(150),
   saga_name VARCHAR(150),
   division_name VARCHAR(150),
@@ -131,16 +144,24 @@ CREATE TABLE projects (
   total_budget DECIMAL(15,2),
   funds_disbursed DECIMAL(15,2),
   funds_utilized DECIMAL(15,2),
+  progress_calculation_mode VARCHAR(50) DEFAULT 'manual',
+  linked_sub_kpi_codes VARCHAR(255),
+  milestones_completed INT DEFAULT 0,
+  milestones_total INT DEFAULT 5,
+  tasks_on_track INT DEFAULT 3,
+  tasks_total INT DEFAULT 4,
   gantt_task_name VARCHAR(250),
-  FOREIGN KEY (flagship_id) REFERENCES flagships(id) ON DELETE SET NULL
+  priority_tier VARCHAR(50) DEFAULT 'High',
+  created_by INT DEFAULT 1,
+  mock_2026_27 TINYINT(1) NOT NULL DEFAULT 0,
+  FOREIGN KEY (flagship_id) REFERENCES flagships(id) ON DELETE SET NULL,
+  FOREIGN KEY (directorate_id) REFERENCES directorates(id) ON DELETE SET NULL,
+  FOREIGN KEY (saga_id) REFERENCES sagas(id) ON DELETE SET NULL,
+  FOREIGN KEY (division_id) REFERENCES divisions(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO projects (id, programme_title, sub_programme, description, remarks, category, directorate_name, saga_name, division_name, delivery_unit, flagship_id, start_date, end_date, status, progress_status, total_budget, funds_disbursed, funds_utilized, gantt_task_name) VALUES
-(1, 'Specialized Regional Cancer & Clinical Infrastructure Programme', 'Kenyatta National Hospital (KNH) Modern Burns ICU & Plastic Surgery Center', 'State-of-the-art 82-bed specialized burns unit with hyperbaric chambers and dedicated surgical suites.', 'Mechanical and medical gas piping ongoing; theaters undergoing validation.', 'Saga', NULL, 'Kenyatta National Hospital', NULL, 'Kenyatta National Hospital', 1, '2024-02-01', '2026-08-31', 'In Progress', '91%', 2850000000.00, 2350000000.00, 2180000000.00, 'KNH Burns Unit & ICU Modernization'),
-(2, 'Specialized Regional Cancer & Clinical Infrastructure Programme', 'Moi Teaching and Referral Hospital (MTRH) 62-Bed Multi-Organ Transplant Center', 'Specialized organ harvesting, kidney and liver transplant suites with tissue matching labs.', 'Structural works completed; clean room HVAC testing commenced.', 'Saga', NULL, 'Moi Teaching and Referral Hospital', NULL, 'Moi Teaching & Referral Hospital', 1, '2023-09-15', '2026-12-15', 'In Progress', '91%', 3400000000.00, 2700000000.00, 2510000000.00, 'MTRH Transplant Center');
-
--- 7. PERFORMANCE KPIS TABLE (6 Categories A-F summing to 100)
-CREATE TABLE performance_kpis (
+-- 7. PERFORMANCE CONTRACTS TABLE
+CREATE TABLE performance_contracts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   code VARCHAR(50) NOT NULL UNIQUE,
   category VARCHAR(100) NOT NULL,
@@ -148,36 +169,163 @@ CREATE TABLE performance_kpis (
   delivery_unit VARCHAR(150),
   programme VARCHAR(250),
   kpi_name VARCHAR(250) NOT NULL,
-  target_score VARCHAR(100),
-  actual_score VARCHAR(100),
+  target_baseline_2026_27 VARCHAR(100),
+  baseline_score VARCHAR(100),
+  actual_2025_26 VARCHAR(100),
+  target_2025_26 VARCHAR(100),
   current_achievement INT DEFAULT 0,
   status VARCHAR(50) DEFAULT 'Approved',
-  financial_year VARCHAR(50) DEFAULT '2026/2027'
+  financial_year VARCHAR(50) DEFAULT '2026/2027',
+  actual_2026_27 VARCHAR(100) NULL,
+  achievement_2026_27 INT NULL,
+  actual_2026_27_asof DATE NULL,
+  mock_2026_27 TINYINT(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO performance_kpis (id, code, category, category_weight, delivery_unit, programme, kpi_name, target_score, actual_score, current_achievement, status, financial_year) VALUES
-(1, 'A-01', 'Financial Stewardship', 10.00, 'Directorate of Administration', 'General Administration & Planning', 'Percentage absorption of development & recurrent votes', '100%', '92%', 92, 'Approved', '2026/2027'),
-(2, 'B-01', 'Service Delivery', 15.00, 'Directorate for Family Health', 'UHC Programme', 'Number of functional Primary Care Networks (PCNs) established', '315', '290', 90, 'Approved', '2026/2027'),
-(3, 'C-01', 'Core Mandate', 65.00, 'Health Infrastructure & Referral', 'Specialized Referral Services', 'Specialized healthcare bed capacity and critical care expansion', '95%', '91%', 91, 'Approved', '2026/2027'),
-(4, 'D-01', 'Implementation of Presidential Directives', 2.00, 'Executive Office', 'Presidential Flagship Delivery', 'Adherence to UHC & Afya Care presidential rollout milestones', '100%', '95%', 95, 'Approved', '2026/2027'),
-(5, 'E-01', 'Affirmative Action in Procurement', 4.00, 'Supply Chain Directorate', 'Procurement Stewardship', 'AGPO (Youth, Women, PWD) public procurement allocation ratio', '30%', '32%', 95, 'Approved', '2026/2027'),
-(6, 'F-01', 'Cross - Cutting', 4.00, 'All Directorates', 'Cross-Cutting Operations', 'Clean audit reports, anti-corruption compliance and public service delivery', '100%', '90%', 90, 'Approved', '2026/2027');
+INSERT INTO performance_contracts (id, code, category, category_weight, delivery_unit, programme, kpi_name, target_baseline_2026_27, baseline_score, actual_2025_26, target_2025_26, current_achievement, status, financial_year, actual_2026_27, achievement_2026_27, actual_2026_27_asof, mock_2026_27) VALUES
+(1, 'A1', 'Financial Stewardship', 10.00, 'Directorate of Administration', 'General Administration & Planning', 'Percentage absorption of development & recurrent votes', '100%', '92%', '91%', '100%', 92, 'Approved', '2026/2027', '28.6', 29, '2026-09-30', 1),
+(2, 'A3', 'Financial Stewardship', 10.00, 'Directorate of Administration', 'General Administration & Planning', 'Pending bills settlement ratio', '100%', '88%', '85%', '100%', 89, 'Approved', '2026/2027', '27.9', 28, '2026-09-30', 1),
+(3, 'B1', 'Service Delivery', 15.00, 'Directorate for Family Health', 'UHC Programme', 'Number of functional Primary Care Networks (PCNs) established', '315', '260', '250', '300', 90, 'Approved', '2026/2027', '100', 100, '2026-09-30', 1),
+(4, 'B2', 'Service Delivery', 15.00, 'Directorate for Family Health', 'UHC Programme', 'Citizen Charter compliance rate', '100%', '95%', '94%', '100%', 96, 'Approved', '2026/2027', '100', 100, '2026-09-30', 1),
+(5, 'C1.1', 'Core Mandate', 65.00, 'Health Infrastructure & Referral', 'Specialized Referral Services', 'Specialized healthcare bed capacity and critical care expansion', '95%', '90%', '88%', '92%', 91, 'Approved', '2026/2027', NULL, NULL, NULL, 0),
+(6, 'C1.2', 'Core Mandate', 65.00, 'Health Informatics & Digital Health', 'Digital Health', 'Afya Care UHC Digitization & EHR Coverage', '85%', '70%', '65%', '80%', 77, 'Approved', '2026/2027', NULL, NULL, NULL, 0),
+(7, 'C3.1', 'Core Mandate', 65.00, 'Kenyatta National Hospital', 'Specialized Services', 'Heart and Cardiothoracic Surgeries Conducted', '300', '250', '240', '280', 91, 'Approved', '2026/2027', NULL, NULL, NULL, 0),
+(8, 'C3.2', 'Core Mandate', 65.00, 'Moi Teaching and Referral Hospital', 'Transplant Services', 'Number of Kidney Transplants Conducted', '50', '40', '38', '45', 91, 'Approved', '2026/2027', NULL, NULL, NULL, 0),
+(9, 'C4.1', 'Core Mandate', 65.00, 'Directorate for Family Health', 'NASCOP', 'Viral Load Suppression Rate', '95%', '94%', '93%', '95%', 94, 'Approved', '2026/2027', NULL, NULL, NULL, 0),
+(10, 'C4.2', 'Core Mandate', 65.00, 'Directorate for Kenya National Blood Services', 'Blood Safety', 'Units of Whole Blood Collected and Screened', '450000', '400000', '390000', '420000', 88, 'Approved', '2026/2027', NULL, NULL, NULL, 0),
+(11, 'D1', 'Implementation of Presidential Directives', 2.00, 'Executive Office', 'Presidential Flagship Delivery', 'Adherence to UHC & Afya Care presidential rollout milestones', '100%', '95%', '93%', '100%', 95, 'Approved', '2026/2027', '30.9', 31, '2026-09-30', 1),
+(12, 'E1', 'Affirmative Action in Procurement', 4.00, 'Supply Chain Directorate', 'Procurement Stewardship', 'AGPO (Youth, Women, PWD) public procurement allocation ratio', '500381721', '30%', '31%', '30%', 95, 'Approved', '2026/2027', '119341420', 24, '2026-09-30', 1),
+(13, 'F1', 'Cross - Cutting', 4.00, 'All Directorates', 'Cross-Cutting Operations', 'Clean audit reports, anti-corruption compliance and public service delivery', '100%', '90%', '88%', '100%', 90, 'Approved', '2026/2027', '100', 100, '2026-09-30', 1),
+(14, 'F3', 'Cross - Cutting', 4.00, 'All Directorates', 'Institutional Capacity', 'Staff productivity and capacity building index', '90%', '82%', '80%', '88%', 85, 'Approved', '2026/2027', '21.7', 22, '2026-09-30', 1),
+(15, 'F4', 'Cross - Cutting', 4.00, 'All Directorates', 'Monitoring & Evaluation', 'M&E quarterly reporting compliance rate', '100%', '95%', '92%', '100%', 96, 'Approved', '2026/2027', '96', 96, '2026-09-30', 1);
 
--- 8. MONTHLY KPI PROGRESS TABLE (6 Months Demo Data)
-CREATE TABLE monthly_kpi_progress (
+-- 8. SUB PROGRAMMES TABLE
+CREATE TABLE sub_programmes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sp_code VARCHAR(50) NOT NULL UNIQUE,
+  sp_name VARCHAR(250) NOT NULL,
+  approved_budget_2026_27_m DECIMAL(15,2) NULL,
+  actual_expenditure_ytd_2026_27_m DECIMAL(15,2) NULL,
+  ytd_as_of DATE NULL,
+  mock_2026_27 TINYINT(1) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO sub_programmes (id, sp_code, sp_name, approved_budget_2026_27_m, actual_expenditure_ytd_2026_27_m, ytd_as_of, mock_2026_27) VALUES
+(1, 'SP.1.1', 'Curative Health Services Sub-Programme', 50607.00, 11042.00, '2026-09-30', 1),
+(2, 'SP.1.2', 'Maternal and Child Health Sub-Programme', 3024.00, 766.00, '2026-09-30', 1),
+(3, 'SP.1.3', 'Emergency Medical Services Sub-Programme', 874.00, 198.00, '2026-09-30', 1),
+(4, 'SP.1.4', 'Specialized Referral Services Sub-Programme', 21618.00, 4523.00, '2026-09-30', 1),
+(5, 'SP.2.1', 'Preventive & Promotive Health Sub-Programme', 5295.00, 1167.00, '2026-09-30', 1),
+(6, 'SP.2.2', 'Immunization & Vaccine Logistics Sub-Programme', 1588.00, 433.00, '2026-09-30', 1),
+(7, 'SP.2.3', 'Communicable Disease Control Sub-Programme', 5802.00, 1575.00, '2026-09-30', 1),
+(8, 'SP.2.4', 'Non-Communicable Diseases Sub-Programme', 6596.00, 1718.00, '2026-09-30', 1),
+(9, 'SP.3.1', 'Health Products & Technologies Sub-Programme', 3512.00, 718.00, '2026-09-30', 1),
+(10, 'SP.3.2', 'Blood Transfusion Services Sub-Programme', 506.00, 127.00, '2026-09-30', 1),
+(11, 'SP.4.1', 'Health Policy, Planning & M&E Sub-Programme', 3949.00, 971.00, '2026-09-30', 1),
+(12, 'SP.4.2', 'Health Regulatory Services Sub-Programme', 91.00, 22.00, '2026-09-30', 1),
+(13, 'SP.4.3', 'Digital Health & Health Informatics Sub-Programme', 30849.00, 8579.00, '2026-09-30', 1);
+
+-- 9. PROJECT KPIS TABLE
+CREATE TABLE project_kpis (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  kpi_code VARCHAR(50) NOT NULL UNIQUE,
+  kpi_name VARCHAR(250) NOT NULL,
+  actual_2026_27 DECIMAL(15,2) NULL,
+  achievement_2026_27 INT NULL,
+  actual_2026_27_asof DATE NULL,
+  mock_2026_27 TINYINT(1) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO project_kpis (id, kpi_code, kpi_name, actual_2026_27, achievement_2026_27, actual_2026_27_asof, mock_2026_27) VALUES
+(1, 'KNH-SSC-01', 'Cardiothoracic Procedures', 194.00, 25, '2026-09-30', 1),
+(2, 'KNH-SSC-02', 'Neurosurgery Operations', 362.00, 24, '2026-09-30', 1),
+(3, 'KNH-SSC-03', 'Renal Transplants', 5.00, 21, '2026-09-30', 1),
+(4, 'KNH-SSC-04', 'Oncology Radiotherapy Sessions', 3187.00, 30, '2026-09-30', 1),
+(5, 'KNH-SSC-05', 'ICU Patient Admissions', 180.00, 28, '2026-09-30', 1),
+(6, 'KNH-SSC-06', 'Specialist Outpatient Visits', 11925.00, 25, '2026-09-30', 1),
+(7, 'KNH-RES-01', 'Medical Research Papers Published', 1.00, 20, '2026-09-30', 1),
+(8, 'KNH-WT-01', 'Theatre Equipment Uptime Rate', 41.10, 83, '2026-09-30', 1),
+(9, 'KNH-WT-02', 'ICU Ventilator Availability Rate', 17.20, 96, '2026-09-30', 1),
+(10, 'KNH-WT-03', 'Laboratory Reagent Stock Availability', 2.20, 91, '2026-09-30', 1),
+(11, 'KNH-OUT-01', 'Patient Satisfaction Score Index', 112.00, 27, '2026-09-30', 1),
+(12, 'JOOTRH-SSC-01', 'General Surgeries Conducted', 27.00, 27, '2026-09-30', 1),
+(13, 'JOOTRH-SSC-02', 'Orthopedic Surgeries', 76.00, 24, '2026-09-30', 1),
+(14, 'JOOTRH-SSC-03', 'Paediatric Ward Admissions', 34.00, 28, '2026-09-30', 1),
+(15, 'JOOTRH-SSC-04', 'Maternal Deliveries Managed', 55.00, 22, '2026-09-30', 1),
+(16, 'JOOTRH-SSC-05', 'Emergency Trauma Interventions', 124.00, 22, '2026-09-30', 1),
+(17, 'JOOTRH-SSC-06', 'Dialysis Sessions Rendered', 45.00, 26, '2026-09-30', 1),
+(18, 'JOOTRH-SSC-07', 'ICU / Critical Care Admissions', 37.00, 23, '2026-09-30', 1),
+(19, 'JOOTRH-SSC-08', 'Blood Transfusion Units Issued', 196.00, 21, '2026-09-30', 1),
+(20, 'JOOTRH-SSC-09', 'Radiology & X-Ray Scans', 27.00, 24, '2026-09-30', 1),
+(21, 'JOOTRH-SSC-10', 'Physiotherapy & Rehabilitation', 760.00, 22, '2026-09-30', 1),
+(22, 'JOOTRH-SSC-11', 'Outpatient Consultations', 34492.00, 23, '2026-09-30', 1),
+(23, 'JOOTRH-SSC-12', 'Laboratory Diagnostic Tests', 2037.00, 30, '2026-09-30', 1),
+(24, 'JOOTRH-SSC-13', 'Equipment Uptime Rate', 9.00, 89, '2026-09-30', 1),
+(25, 'JOOTRH-RTT-01', 'Community Health Unit Linkages', 19.00, 21, '2026-09-30', 1),
+(26, 'JOOTRH-RTT-02', 'Specialized Medical Camps', 1.00, 20, '2026-09-30', 1),
+(27, 'JOOTRH-RTT-03', 'Continuous Medical Education (CME)', 45.00, 30, '2026-09-30', 1),
+(28, 'JOOTRH-RTT-04', 'Referral Network Feedback Audits', 1.00, 25, '2026-09-30', 1),
+(29, 'MNTRH-MH-01', 'Maternal Health Visits', 55144.00, 26, '2026-09-30', 1),
+(30, 'MNTRH-MH-02', 'Skilled Birth Deliveries', 384.00, 30, '2026-09-30', 1),
+(31, 'MNTRH-MH-03', 'Antenatal Care (ANC) 4th Visit', 1071.00, 30, '2026-09-30', 1),
+(32, 'MNTRH-MH-04', 'Postnatal Care Consultations', 378.00, 27, '2026-09-30', 1),
+(33, 'MNTRH-MH-05', 'Immunization Coverage (Fully Immunized)', 57521.00, 29, '2026-09-30', 1),
+(34, 'MNTRH-MH-06', 'Newborn Resuscitation Success', 44.80, 100, '2026-09-30', 1),
+(35, 'MNTRH-MH-07', 'Child Nutrition Screening & Support', 38.30, 84, '2026-09-30', 1),
+(36, 'MNTRH-MH-08', 'Maternal Mortality Audit Compliance', 97.30, 97, '2026-09-30', 1),
+(37, 'MNTRH-MH-09', 'EmONC Functional Facility Rate', 78.10, 92, '2026-09-30', 1),
+(38, 'MNTRH-MH-10', 'Family Planning Acceptance Rate', 83.70, 98, '2026-09-30', 1),
+(39, 'MNTRH-MH-11', 'Adolescent Reproductive Health Clinics', 1.00, 25, '2026-09-30', 1),
+(40, 'MNTRH-MH-12', 'Community Health Promoters (CHP) Reports', 1.00, 25, '2026-09-30', 1),
+(41, 'MNTRH-MH-13', 'Gynaecological Surgeries', 17.00, 26, '2026-09-30', 1),
+(42, 'MNTRH-MH-14', 'Maternal Satisfaction Index', 74.00, 92, '2026-09-30', 1),
+(43, 'MNTRH-INT-01', 'Integrated Outreach Health Services', 19100.00, 27, '2026-09-30', 1);
+
+-- 10. INSERT 8 MOCK PROJECTS STARTING IN FY 2026/27
+INSERT INTO projects (project_code, programme_title, sub_programme, description, remarks, location, type, category, directorate_id, saga_id, division_id, delivery_unit, flagship_id, start_date, end_date, status, progress_status, total_budget, funds_disbursed, funds_utilized, progress_calculation_mode, linked_sub_kpi_codes, milestones_completed, milestones_total, tasks_on_track, tasks_total, gantt_task_name, priority_tier, created_by, mock_2026_27) VALUES
+('MOCK-2026-001', 'Kenyatta National Hospital Cardiothoracic Theatre Expansion', 'KNH Cardiothoracic Theatre Expansion', '[MOCK] Construction and equipping of two additional cardiothoracic theatres at KNH to reduce the surgical backlog.', 'On track; civil works at foundation stage.', 'Nairobi County', 'Project', 'Saga', NULL, 1, NULL, 'Kenyatta National Hospital', NULL, '2026-07-01', '2027-12-31', 'In Progress', '22%', 420000000, 168000000, 92000000, 'manual', 'C3.1', 1, 5, 2, 3, 'KNH cardiothoracic theatre expansion', 'High', 1, 1),
+('MOCK-2026-002', 'JOOTRH Renal and Dialysis Centre Equipping', 'JOOTRH Renal and Dialysis Centre Equipping', '[MOCK] Procurement and installation of dialysis machines and water treatment plant at JOOTRH.', 'Equipment tender evaluated; delivery expected Q3.', 'Kisumu County', 'Project', 'Saga', NULL, 1, NULL, 'Kenyatta National Hospital', NULL, '2026-08-01', '2027-09-30', 'In Progress', '18%', 280000000, 112000000, 48000000, 'manual', 'C3.2', 1, 4, 2, 3, 'JOOTRH renal centre equipping', 'High', 1, 1),
+('MOCK-2026-003', 'National Blood Transfusion Service Regional Centres Upgrade', 'National Blood Transfusion Service Regional Centres Upgrade', '[MOCK] Upgrade of regional blood transfusion centres: cold chain, testing equipment and donor facilities.', 'Delayed: procurement of cold chain equipment re-advertised.', 'Countrywide', 'Project', 'Directorate', 5, NULL, 5, 'Directorate for Kenya National Blood Tissues & Transfusion Services', NULL, '2026-07-01', '2028-06-30', 'Delayed', '12%', 310000000, 120000000, 31000000, 'manual', 'C4.2', 1, 5, 1, 3, 'NBTS regional centres upgrade', 'High', 1, 1),
+('MOCK-2026-004', 'National EMS Ambulance Dispatch Centres', 'National EMS Ambulance Dispatch Centres', '[MOCK] Establishment of regional ambulance dispatch and coordination centres under the EMS flagship.', 'Site surveys complete in 6 counties.', 'Countrywide', 'Project', 'Directorate', 1, NULL, NULL, 'Directorate for Curative Services', NULL, '2026-09-01', '2027-12-31', 'In Progress', '15%', 600000000, 240000000, 70000000, 'manual', '', 1, 4, 3, 4, 'EMS dispatch centres setup', 'High', 1, 1),
+('MOCK-2026-005', 'Primary Care Networks (PCN) Rollout Phase II', 'Primary Care Networks (PCN) Rollout Phase II', '[MOCK] Establishment of an additional 60 functional Primary Care Networks in partnership with county health departments.', 'Good uptake in 14 counties; staffing gaps in arid counties.', 'Various Counties', 'Project', 'Directorate', 2, NULL, 1, 'Division of Primary Health Care', NULL, '2026-07-01', '2028-06-30', 'In Progress', '28%', 520000000, 300000000, 140000000, 'manual', 'C1.1', 2, 5, 3, 4, 'PCN rollout phase II', 'High', 1, 1),
+('MOCK-2026-006', 'Electronic Health Records Rollout to Level 5 Hospitals', 'Electronic Health Records Rollout to Level 5 Hospitals', '[MOCK] Deployment of the standardized EHR system to Level 5 referral hospitals under the UHC digitization flagship.', 'Go-live completed in 9 of 22 hospitals.', 'Countrywide', 'Project', 'Directorate', 4, NULL, 4, 'Division of Health Informatics and m-Health', 1, '2026-07-01', '2027-03-31', 'In Progress', '40%', 900000000, 540000000, 372000000, 'manual', 'C1.2', 2, 4, 3, 4, 'EHR rollout to Level 5 hospitals', 'Critical', 1, 1),
+('MOCK-2026-007', 'National TB and Malaria Case Detection Scale-Up', 'National TB and Malaria Case Detection Scale-Up', '[MOCK] Expansion of community case finding, GeneXpert coverage and malaria rapid diagnostic testing.', 'Case notification trending upward.', 'Countrywide', 'Project', 'Directorate', 1, NULL, 3, 'Division of Disease Surveillance and Response', NULL, '2026-07-01', '2029-06-30', 'In Progress', '24%', 450000000, 180000000, 95000000, 'manual', '', 1, 4, 2, 3, 'TB and malaria case detection scale-up', 'Medium', 1, 1),
+('MOCK-2026-008', 'National Health Research Data Repository', 'National Health Research Data Repository', '[MOCK] Establishment of a national repository for health research data and protocols.', 'Awaiting approval of concept note and budget release.', 'Nairobi County', 'Project', 'Directorate', 4, NULL, 4, 'Division of Health Informatics and m-Health', NULL, '2026-11-01', '2028-06-30', 'Planning', '0%', 150000000, 0, 0, 'manual', '', 0, 3, 0, 2, 'Health research data repository', 'Medium', 1, 1);
+
+-- 11. MONTHLY KPI PERFORMANCE TABLE
+CREATE TABLE project_monthly_progress (
   id INT AUTO_INCREMENT PRIMARY KEY,
   project_id INT,
   period_month VARCHAR(20) NOT NULL,
-  progress_percentage INT NOT NULL,
+  target_pct DECIMAL(5,2) DEFAULT 0.00,
+  achieved_pct DECIMAL(5,2) DEFAULT 0.00,
+  kpi_code VARCHAR(50) NULL,
+  kpi_name VARCHAR(250) NULL,
+  kpi_target DECIMAL(15,2) NULL,
+  kpi_achieved DECIMAL(15,2) NULL,
+  kpi_unit VARCHAR(50) NULL,
+  progress_percentage INT NOT NULL DEFAULT 0,
   remarks TEXT,
   recorded_by VARCHAR(150),
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO monthly_kpi_progress (id, project_id, period_month, progress_percentage, remarks, recorded_by) VALUES
-(1, 1, '2026-01', 70, 'Initial civil and mechanical groundwork.', 'Dr. Harry Kimtai'),
-(2, 1, '2026-02', 76, 'Medical gas piping and surgical theater framing.', 'Dr. Harry Kimtai'),
-(3, 1, '2026-03', 82, 'Installation of ICU monitoring telemetry systems.', 'Dr. Harry Kimtai'),
-(4, 1, '2026-04', 87, 'Staff training and biomedical calibration.', 'Dr. Harry Kimtai'),
-(5, 1, '2026-05', 90, 'Pre-commissioning safety audits.', 'Dr. Harry Kimtai'),
-(6, 1, '2026-06', 91, 'Commissioning and handover ready.', 'Dr. Harry Kimtai');
+INSERT INTO project_monthly_progress (project_id, period_month, target_pct, achieved_pct, kpi_code, kpi_name, kpi_target, kpi_achieved, kpi_unit, progress_percentage, remarks, recorded_by) VALUES
+((SELECT id FROM projects WHERE project_code='MOCK-2026-001' LIMIT 1), 'Jul 2026', 10, 8, 'C3.1', 'Heart and Cardiothoracic Surgeries Conducted', 71, 68, 'Surgeries', 8, '[MOCK] Site mobilization and contractor on site.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-001' LIMIT 1), 'Aug 2026', 17, 15, 'C3.1', 'Heart and Cardiothoracic Surgeries Conducted', 142, 141, 'Surgeries', 15, '[MOCK] Excavation and piling works.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-001' LIMIT 1), 'Sep 2026', 24, 22, 'C3.1', 'Heart and Cardiothoracic Surgeries Conducted', 213, 212, 'Surgeries', 22, '[MOCK] Foundation works under way.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-002' LIMIT 1), 'Aug 2026', 8, 6, 'C3.2', 'Number of Kidney Transplants Conducted', 5, 4, 'Transplants', 6, '[MOCK] Equipment tender evaluated.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-002' LIMIT 1), 'Sep 2026', 20, 18, 'C3.2', 'Number of Kidney Transplants Conducted', 8, 7, 'Transplants', 18, '[MOCK] Contract award; site preparation for water treatment plant.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-003' LIMIT 1), 'Jul 2026', 8, 5, 'C4.2', 'Units of Whole Blood Collected and Screened', 33333, 30900, 'Units', 5, '[MOCK] Needs assessment of regional centres.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-003' LIMIT 1), 'Aug 2026', 14, 8, 'C4.2', 'Units of Whole Blood Collected and Screened', 66667, 64200, 'Units', 8, '[MOCK] Cold chain tender re-advertised.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-003' LIMIT 1), 'Sep 2026', 20, 12, 'C4.2', 'Units of Whole Blood Collected and Screened', 100000, 97500, 'Units', 12, '[MOCK] Procurement delay; donor facility designs approved.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-004' LIMIT 1), 'Sep 2026', 16, 15, NULL, NULL, NULL, NULL, NULL, 15, '[MOCK] Site surveys complete in 6 counties.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-005' LIMIT 1), 'Jul 2026', 10, 9, 'C1.1', 'Operationalization of Primary Care Networks (PCNs)', 26, 24, 'PCNs', 9, '[MOCK] County sensitization and facility readiness assessments.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-005' LIMIT 1), 'Aug 2026', 20, 18, 'C1.1', 'Operationalization of Primary Care Networks (PCNs)', 53, 50, 'PCNs', 18, '[MOCK] Hub facilities designated in 9 counties.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-005' LIMIT 1), 'Sep 2026', 30, 28, 'C1.1', 'Operationalization of Primary Care Networks (PCNs)', 79, 76, 'PCNs', 28, '[MOCK] Uptake in 14 counties; staffing gaps in arid counties.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-006' LIMIT 1), 'Jul 2026', 12, 12, 'C1.2', 'Afya Care UHC Digitization & EHR Coverage', 70, 66, '% facilities', 12, '[MOCK] Hospital readiness assessments completed.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-006' LIMIT 1), 'Aug 2026', 25, 26, 'C1.2', 'Afya Care UHC Digitization & EHR Coverage', 72, 68, '% facilities', 26, '[MOCK] Go-live in 5 hospitals.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-006' LIMIT 1), 'Sep 2026', 38, 40, 'C1.2', 'Afya Care UHC Digitization & EHR Coverage', 74, 69.8, '% facilities', 40, '[MOCK] Go-live completed in 9 of 22 hospitals.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-007' LIMIT 1), 'Jul 2026', 8, 7, NULL, NULL, NULL, NULL, NULL, 7, '[MOCK] Community case-finding teams trained.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-007' LIMIT 1), 'Aug 2026', 16, 15, NULL, NULL, NULL, NULL, NULL, 15, '[MOCK] GeneXpert coverage extended to additional sub-counties.', 'Dr. Harry Kimtai'),
+((SELECT id FROM projects WHERE project_code='MOCK-2026-007' LIMIT 1), 'Sep 2026', 25, 24, NULL, NULL, NULL, NULL, NULL, 24, '[MOCK] Case notification trending upward.', 'Dr. Harry Kimtai');
