@@ -9,13 +9,109 @@ import {
   INITIAL_PROGRAMMES, ProgrammeItem, SubProgrammeItem, DeliveryUnitItem, OutputItem, SubKpiItem
 } from './data/programmesData';
 import {
-  Activity, ArrowUpRight, BarChart3, Bell, Building2, Calendar, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
+  Activity, ArrowRight, ArrowUpRight, BarChart3, Bell, Building2, Calendar, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   CircleDot, ClipboardCheck, Clock, Download, ExternalLink, Eye, FileSpreadsheet,
   FileText, Filter, Fingerprint, Flag, FolderGit2, FolderOpen, Gauge, HardDriveDownload,
   Info, KeyRound, Layers, LayoutDashboard, ListFilter, Lock, LogOut, Mail,
   MapPin, Milestone, Paperclip, PenSquare, Plus, PlusCircle, Search,
   Server, Settings, Shield, ShieldAlert, ShieldCheck, Sliders, TableProperties, Target, Trash2, User, UserCheck, Users, Users2, X
 } from 'lucide-react';
+
+/* ============================================================
+   NOTIFICATIONS & APPROVAL WORKFLOW MODELS
+   ============================================================ */
+export interface AppNotification {
+  id: number;
+  title: string;
+  message: string;
+  module: string;
+  timestamp: string;
+  read: boolean;
+  severity: 'info' | 'warning' | 'approval' | 'success';
+  relatedLogId?: number;
+}
+
+export interface PendingChange {
+  id: number;
+  actionId: number;
+  refNo: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
+  reason: string;
+  requestedBy: string;
+  requestedAt: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+const INITIAL_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: 1,
+    title: 'Action point change pending approval',
+    message: 'A change to action point AP-2026-014 was submitted and is awaiting executive approval.',
+    module: 'Action Points Tracker',
+    timestamp: '2026-02-14 08:05:12',
+    read: false,
+    severity: 'approval',
+    relatedLogId: 2
+  },
+  {
+    id: 2,
+    title: 'Finance figures updated',
+    message: 'Budget allocation and disbursement figures were updated for the Afya Care UHC project.',
+    module: 'Finance Records',
+    timestamp: '2026-02-14 07:52:40',
+    read: false,
+    severity: 'info',
+    relatedLogId: 3
+  },
+  {
+    id: 3,
+    title: 'Performance Contract indicator reviewed',
+    message: 'Sub-KPI C3.1 achievement was reviewed and recalculated against linked projects.',
+    module: 'Performance Contract',
+    timestamp: '2026-02-13 16:20:05',
+    read: false,
+    severity: 'info',
+    relatedLogId: 4
+  },
+  {
+    id: 4,
+    title: 'New user account created',
+    message: 'A new M&E Officer account was created for the Planning directorate.',
+    module: 'User Management',
+    timestamp: '2026-02-13 11:03:31',
+    read: true,
+    severity: 'success',
+    relatedLogId: 5
+  },
+  {
+    id: 5,
+    title: 'Nightly database backup completed',
+    message: 'The scheduled MySQL backup completed successfully with 0 errors.',
+    module: 'CPANEL & BACKUP',
+    timestamp: '2026-02-13 02:00:00',
+    read: true,
+    severity: 'success'
+  }
+];
+
+const INITIAL_PENDING_CHANGES: PendingChange[] = [
+  {
+    id: 1,
+    actionId: 1,
+    refNo: 'AP-2026-001',
+    field: 'Status',
+    oldValue: 'ON TRACK',
+    newValue: 'COMPLETED',
+    reason: 'All deliverables for the KNH Burns ICU commissioning were verified and handed over.',
+    requestedBy: 'Eng. Peter Mutua',
+    requestedAt: '2026-02-14 08:02:11',
+    status: 'Pending'
+  }
+];
 
 export default function App() {
   // Navigation
@@ -34,6 +130,22 @@ export default function App() {
   const [reports, setReports] = useState<ReportItem[]>(INITIAL_REPORTS);
   const [kpis, setKpis] = useState<PerformanceKPI[]>(INITIAL_KPIS);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
+
+  // Notifications & Approval Workflow
+  const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>(INITIAL_PENDING_CHANGES);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [actionChangeDraft, setActionChangeDraft] = useState<{
+    actionId: number;
+    refNo: string;
+    field: string;
+    oldValue: string;
+    newValue: string;
+    reason: string;
+  } | null>(null);
+  const [showAllFlagshipFields, setShowAllFlagshipFields] = useState(false);
+  const [projectsRegistryTab, setProjectsRegistryTab] = useState<'registries' | 'finance'>('registries');
+  const [financeEditProject, setFinanceEditProject] = useState<Project | null>(null);
 
   // Sub-views & Filters
   const [selectedFlagship, setSelectedFlagship] = useState<Flagship | null>(null);
@@ -274,6 +386,166 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  /* ============================================================
+     NOTIFICATION / AUDIT HELPERS
+     ============================================================ */
+  const nowStamp = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const logAudit = (
+    action: AuditLogItem['action'],
+    module: string,
+    details: string,
+    recordId?: number | string
+  ) => {
+    const entry: AuditLogItem = {
+      id: Math.max(0, ...auditLogs.map(a => a.id)) + 1,
+      user_name: currentUser.full_name,
+      email: currentUser.email,
+      action,
+      module,
+      record_id: recordId,
+      details,
+      ip_address: '196.201.214.18',
+      timestamp: nowStamp()
+    };
+    setAuditLogs(prev => [entry, ...prev]);
+    return entry;
+  };
+
+  const pushNotification = (
+    title: string,
+    message: string,
+    module: string,
+    severity: AppNotification['severity'],
+    relatedLogId?: number
+  ) => {
+    setNotifications(prev => [
+      {
+        id: Math.max(0, ...prev.map(n => n.id)) + 1,
+        title,
+        message,
+        module,
+        timestamp: nowStamp(),
+        read: false,
+        severity,
+        relatedLogId
+      },
+      ...prev
+    ]);
+  };
+
+  const openNotification = (n: AppNotification) => {
+    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+    setShowNotifications(false);
+    if (n.relatedLogId) {
+      const log = auditLogs.find(a => a.id === n.relatedLogId);
+      if (log) {
+        setActiveTab('audit_logs');
+        setSelectedAuditLog(log);
+        return;
+      }
+    }
+    setActiveTab('audit_logs');
+    setAuditSearch(n.module);
+  };
+
+  const submitActionChange = () => {
+    if (!actionChangeDraft) return;
+    if (!actionChangeDraft.reason.trim()) {
+      showToast('Please provide a reason for this action change.');
+      return;
+    }
+    const change: PendingChange = {
+      id: Math.max(0, ...pendingChanges.map(c => c.id)) + 1,
+      actionId: actionChangeDraft.actionId,
+      refNo: actionChangeDraft.refNo,
+      field: actionChangeDraft.field,
+      oldValue: actionChangeDraft.oldValue,
+      newValue: actionChangeDraft.newValue,
+      reason: actionChangeDraft.reason,
+      requestedBy: currentUser.full_name,
+      requestedAt: nowStamp(),
+      status: 'Pending'
+    };
+    setPendingChanges(prev => [change, ...prev]);
+    const log = logAudit(
+      'update',
+      'Action Points Tracker',
+      `Change requested on ${change.refNo}: ${change.field} "${change.oldValue}" -> "${change.newValue}". Reason: ${change.reason}. Status: PENDING APPROVAL.`,
+      change.actionId
+    );
+    pushNotification(
+      'Action change pending approval',
+      `${change.requestedBy} requested a change to ${change.refNo} (${change.field}: ${change.oldValue} -> ${change.newValue}). Reason: ${change.reason}`,
+      'Action Points Tracker',
+      'approval',
+      log.id
+    );
+    setActionChangeDraft(null);
+    showToast('Change submitted and set to PENDING APPROVAL.');
+  };
+
+  const approvePendingChange = (change: PendingChange) => {
+    setPendingChanges(prev => prev.map(c => c.id === change.id ? {
+      ...c,
+      status: 'Approved',
+      approvedBy: currentUser.full_name,
+      approvedAt: nowStamp()
+    } : c));
+    setActionPoints(prev => prev.map(a => {
+      if (a.id !== change.actionId) return a;
+      if (change.field === 'Status') return { ...a, status: change.newValue as any };
+      if (change.field === 'Action / Progress') return { ...a, action: change.newValue };
+      if (change.field === 'Person Responsible') return { ...a, person_responsible: change.newValue };
+      if (change.field === 'Timeline') return { ...a, timeline: change.newValue };
+      return a;
+    }));
+    const log = logAudit(
+      'approve',
+      'Action Points Tracker',
+      `Approved change on ${change.refNo} (${change.field}: "${change.oldValue}" -> "${change.newValue}"). Requested by ${change.requestedBy} on ${change.requestedAt}. Approved by ${currentUser.full_name} (${currentUser.role}) at ${nowStamp()}. Reason: ${change.reason}.`,
+      change.actionId
+    );
+    pushNotification(
+      'Action change approved',
+      `${change.refNo} change approved by ${currentUser.full_name} (${currentUser.role}) at ${nowStamp()}.`,
+      'Action Points Tracker',
+      'success',
+      log.id
+    );
+    showToast('Change approved and applied to the action point.');
+  };
+
+  const rejectPendingChange = (change: PendingChange) => {
+    setPendingChanges(prev => prev.map(c => c.id === change.id ? {
+      ...c,
+      status: 'Rejected',
+      approvedBy: currentUser.full_name,
+      approvedAt: nowStamp()
+    } : c));
+    const log = logAudit(
+      'update',
+      'Action Points Tracker',
+      `Rejected change on ${change.refNo} (${change.field}: "${change.oldValue}" -> "${change.newValue}"). Requested by ${change.requestedBy}. Rejected by ${currentUser.full_name} (${currentUser.role}) at ${nowStamp()}. Reason: ${change.reason}.`,
+      change.actionId
+    );
+    pushNotification(
+      'Action change rejected',
+      `${change.refNo} change was rejected by ${currentUser.full_name} (${currentUser.role}) at ${nowStamp()}.`,
+      'Action Points Tracker',
+      'warning',
+      log.id
+    );
+    showToast('Change rejected.');
+  };
+
+  const unreadNotificationCount = notifications.filter(n => !n.read).length;
+  const canViewNotifications = currentUser.is_admin || currentUser.can_approve || currentUser.role.toLowerCase().includes('principal secretary');
+
   const formatKes = (amount: number) => {
     return 'KES ' + amount.toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
@@ -386,7 +658,7 @@ export default function App() {
       )}
 
       {/* Top Ministerial Header */}
-      <header className="bg-gradient-to-r from-[#0a2356] via-[#0d3b82] to-[#0d47a1] text-white px-6 py-3 border-b-2 border-[#08214d] shadow-md">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[#0a2356] via-[#0d3b82] to-[#0d47a1] text-white px-6 py-3 border-b-2 border-[#08214d] shadow-md">
         <div className="flex flex-wrap items-center justify-between gap-4">
           
           <div className="flex items-center gap-4">
@@ -417,19 +689,71 @@ export default function App() {
               <span>Download MySQL Script (.sql)</span>
             </button>
 
-            {/* Notification Bell */}
-            <div className="relative cursor-pointer p-2 bg-white/10 hover:bg-white/20 rounded-full transition" title="5 Active System Notifications">
-              <Bell className="w-4 h-4 text-white" />
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white font-bold text-[10px] w-4 h-4 rounded-full flex items-center justify-center border-2 border-[#0a2356]">
-                5
-              </span>
+            {/* Notification Bell & Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(v => !v)}
+                className="relative cursor-pointer p-2 bg-white/10 hover:bg-white/20 rounded-full transition"
+                title={`${unreadNotificationCount} unread notification(s)`}
+              >
+                <Bell className="w-4 h-4 text-white" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white font-bold text-[10px] w-4 h-4 rounded-full flex items-center justify-center border-2 border-[#0a2356]">
+                    {unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white text-slate-800 rounded-lg shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="px-3 py-2.5 bg-slate-900 text-white flex items-center justify-between">
+                    <span className="text-xs font-bold flex items-center gap-1.5">
+                      <Bell className="w-3.5 h-3.5 text-yellow-300" /> Notifications
+                    </span>
+                    <span className="text-[10px] text-slate-300">{unreadNotificationCount} unread</span>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                    {notifications.length === 0 && (
+                      <div className="p-4 text-xs text-slate-500 text-center">No notifications.</div>
+                    )}
+                    {notifications.map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => openNotification(n)}
+                        className={`w-full text-left px-3 py-2.5 hover:bg-blue-50 transition ${n.read ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-800'}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              n.severity === 'approval' ? 'bg-amber-500' :
+                              n.severity === 'success' ? 'bg-emerald-500' :
+                              n.severity === 'warning' ? 'bg-red-500' : 'bg-blue-500'
+                            }`}></span>
+                            <span className={`text-[11px] font-bold ${n.read ? 'text-slate-400' : 'text-slate-900'}`}>{n.title}</span>
+                          </div>
+                          {!n.read && <span className="text-[9px] font-black text-blue-700 uppercase">New</span>}
+                        </div>
+                        <div className={`text-[10.5px] mt-1 leading-snug ${n.read ? 'text-slate-400' : 'text-slate-600'}`}>{n.message}</div>
+                        <div className="text-[9px] text-slate-400 mt-1 font-mono">{n.module} &bull; {n.timestamp}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => { setShowNotifications(false); setActiveTab('notifications'); }}
+                    className="w-full bg-blue-700 hover:bg-blue-600 text-white text-[11px] font-bold py-2 transition"
+                  >
+                    Open Notifications &amp; Approvals
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* User Role Switcher Pill */}
+            {/* User Role Switcher Pill with Last Login */}
             <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-full border border-white/20">
               <div className="text-left hidden sm:block">
                 <div className="text-xs font-bold leading-none text-white">{currentUser.full_name}</div>
                 <div className="text-[10px] text-sky-200">[{currentUser.role}]</div>
+                <div className="text-[9px] text-sky-300 font-mono mt-0.5">Last login: {currentUser.last_login}</div>
               </div>
               <select 
                 value={currentUser.id}
@@ -488,6 +812,7 @@ export default function App() {
             { id: 'pc', label: 'PERFORMANCE CONTRACT' },
             { id: 'users', label: 'USERS' },
             ...(currentUser.is_admin ? [{ id: 'audit_logs', label: 'AUDIT LOGS' }] : []),
+            ...(canViewNotifications ? [{ id: 'notifications', label: 'NOTIFICATIONS' }] : []),
             { id: 'backup', label: 'CPANEL & BACKUP' },
           ]
             .filter((tab) => enabledModules[tab.id] !== false)
@@ -873,8 +1198,15 @@ export default function App() {
 
                 {/* Linked Projects for this flagship */}
                 <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-bold text-sm text-slate-800">
-                    Linked Portfolio Projects
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-sm text-slate-800">Linked Portfolio Projects</span>
+                    <button
+                      onClick={() => setShowAllFlagshipFields(v => !v)}
+                      className="bg-blue-700 hover:bg-blue-600 text-white text-[11px] font-bold px-3 py-1.5 rounded flex items-center gap-1.5 shadow-sm"
+                    >
+                      <TableProperties className="w-3.5 h-3.5" />
+                      {showAllFlagshipFields ? 'Show Fewer Fields' : 'Show All Fields'}
+                    </button>
                   </div>
                   <div className="p-0 overflow-x-auto">
                     <table className="w-full text-xs text-left">
@@ -882,25 +1214,66 @@ export default function App() {
                         <tr>
                           <th className="p-3">Project Code</th>
                           <th className="p-3">Title</th>
-                          <th className="p-3">Budget</th>
+                          {showAllFlagshipFields && <th className="p-3">Programme Title</th>}
+                          {showAllFlagshipFields && <th className="p-3">Description</th>}
+                          <th className="p-3">Category</th>
+                          {showAllFlagshipFields && <th className="p-3">Implementing Entity</th>}
+                          {showAllFlagshipFields && <th className="p-3">Delivery Unit</th>}
+                          <th className="p-3">Start</th>
+                          {showAllFlagshipFields && <th className="p-3">End</th>}
+                          <th className="p-3 text-right">Budget</th>
+                          {showAllFlagshipFields && <th className="p-3 text-right">Disbursed</th>}
+                          {showAllFlagshipFields && <th className="p-3 text-right">Utilised</th>}
+                          {showAllFlagshipFields && <th className="p-3 text-right">Outstanding</th>}
                           <th className="p-3">Progress</th>
                           <th className="p-3">Status</th>
+                          <th className="p-3 text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {projects.filter(p => p.flagship_id === selectedFlagship.id).map(lp => (
-                          <tr key={lp.id} className="hover:bg-slate-50">
-                            <td className="p-3 font-mono font-bold text-blue-700">{lp.programme_title}</td>
-                            <td className="p-3 font-bold text-slate-800">{lp.sub_programme}</td>
-                            <td className="p-3 font-mono">{formatKes(lp.total_budget)}</td>
-                            <td className="p-3">{lp.progress_status}</td>
-                            <td className="p-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadgeClass(lp.status)}`}>
-                                {lp.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {projects.filter(p => p.flagship_id === selectedFlagship.id).map(lp => {
+                          const { pct } = getProjectCalculatedProgress(lp, kpis);
+                          const outstanding = (lp.total_budget || 0) - (lp.funds_utilized || 0);
+                          return (
+                            <tr key={lp.id} className="hover:bg-slate-50 align-top">
+                              <td className="p-3 font-mono font-bold text-blue-700">{lp.programme_title}</td>
+                              <td className="p-3 font-bold text-slate-800">{lp.sub_programme}</td>
+                              {showAllFlagshipFields && <td className="p-3 text-slate-600">{lp.programme_title}</td>}
+                              {showAllFlagshipFields && <td className="p-3 text-slate-500 max-w-[220px]">{lp.description || '—'}</td>}
+                              <td className="p-3">{lp.category}</td>
+                              {showAllFlagshipFields && <td className="p-3">{lp.directorate_name || lp.saga_name || lp.division_name || 'Ministry of Health'}</td>}
+                              {showAllFlagshipFields && <td className="p-3">{lp.delivery_unit || '—'}</td>}
+                              <td className="p-3 text-slate-500">{lp.start_date}</td>
+                              {showAllFlagshipFields && <td className="p-3 text-slate-500">{lp.end_date}</td>}
+                              <td className="p-3 font-mono text-right">{formatKes(lp.total_budget)}</td>
+                              {showAllFlagshipFields && <td className="p-3 font-mono text-right">{formatKes(lp.funds_disbursed || 0)}</td>}
+                              {showAllFlagshipFields && <td className="p-3 font-mono text-right">{formatKes(lp.funds_utilized || 0)}</td>}
+                              {showAllFlagshipFields && <td className="p-3 font-mono text-right">{formatKes(outstanding)}</td>}
+                              <td className="p-3">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                    <div className="bg-blue-700 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}></div>
+                                  </div>
+                                  <span className="font-bold text-blue-700">{pct}%</span>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadgeClass(lp.status)}`}>
+                                  {lp.status}
+                                </span>
+                              </td>
+                              <td className="p-3 text-center">
+                                <button
+                                  onClick={() => { setActiveTab('projects'); setSelectedProject(lp); }}
+                                  className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded"
+                                  title="Click to view details"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1112,30 +1485,18 @@ export default function App() {
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
                       {/* ================= LEFT COLUMN ================= */}
                       <div className="lg:col-span-5 space-y-4">
-                        {/* Action Card */}
+                        {/* Action Board Card (read-only) */}
                         <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-                          <h3 className="font-extrabold text-sm text-slate-900 mb-2.5">Action:</h3>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <h3 className="font-extrabold text-sm text-slate-900">Action Board</h3>
+                            <span className="text-[9px] font-bold uppercase text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Read-only</span>
+                          </div>
                           <div className="border border-slate-200 rounded p-3 text-xs text-slate-700 leading-relaxed bg-white min-h-[140px] whitespace-pre-line">
                             {selectedProject.description || "National program for HIV/AIDS and STI prevention, treatment, and control. Key indicators include: People Living with HIV, On ART, and With Viral Load Suppression.\n\nNational program for HIV/AIDS and STI prevention, treatment, and control. Key indicators include: People Living with HIV, On ART, and With Viral Load Suppression."}
                           </div>
-
-                          {/* Progress Status Bar */}
-                          <div className="mt-3.5">
-                            <div className="flex justify-between items-center font-extrabold text-xs text-slate-900">
-                              <span>Progress Status: {pct}%</span>
-                              {isDerived && (
-                                <span className="text-[10px] text-blue-700 font-mono font-bold" title={linkedKpis.map(k => `${k.code}: ${k.current_achievement}%`).join(', ')}>
-                                  PC Linked ({linkedKpis.length})
-                                </span>
-                              )}
-                            </div>
-                            <div className="w-full bg-slate-200 rounded-full h-3 mt-1.5 overflow-hidden">
-                              <div 
-                                className="bg-[#475569] h-full rounded-full transition-all duration-500" 
-                                style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
-                              ></div>
-                            </div>
-                          </div>
+                          <p className="text-[10px] text-slate-400 mt-2 italic">
+                            Action Board content is locked. Progress is calculated automatically from linked Performance Contract KPIs.
+                          </p>
                         </div>
 
                         {/* Remarks Card */}
@@ -1396,6 +1757,51 @@ export default function App() {
                     </table>
                   </div>
                 </div>
+
+                {/* Progress Card — at the bottom, auto-calculated from KPIs (read-only) */}
+                {(() => {
+                  const { pct, isDerived, linkedKpis } = getProjectCalculatedProgress(selectedProject, kpis);
+                  return (
+                    <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-3">
+                        <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                          <Gauge className="w-4 h-4 text-blue-700" /> Progress
+                        </h3>
+                        <span className="text-[10px] font-bold uppercase text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                          Auto-calculated from KPIs
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progress Title</div>
+                          <div className="font-bold text-slate-900 mt-1">{selectedProject.gantt_task_name || selectedProject.sub_programme}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">User Account</div>
+                          <div className="font-bold text-slate-900 mt-1">{currentUser.full_name} <span className="text-slate-500 font-normal">({currentUser.role})</span></div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Calculation Source</div>
+                          <div className="font-bold text-slate-900 mt-1">
+                            {isDerived ? `Linked PC KPIs (${linkedKpis.length})` : 'Project baseline'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <div className="flex justify-between items-center font-extrabold text-xs text-slate-900">
+                          <span>Progress Status: {pct}%</span>
+                          <span className="text-[10px] text-slate-400 font-normal italic">Not editable</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-3 mt-1.5 overflow-hidden">
+                          <div
+                            className="bg-[#475569] h-full rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Collapsible Project Editor & PC Sub-KPI Linkage Drawer */}
                 {showProjectEditor && (
@@ -1979,6 +2385,34 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* Registry / Finance Tab Strip */}
+                    <div className="flex items-center gap-1 border-b border-slate-200">
+                      <button
+                        onClick={() => setProjectsRegistryTab('registries')}
+                        className={`px-4 py-2 text-xs font-extrabold rounded-t-lg border-b-2 transition flex items-center gap-1.5 ${
+                          projectsRegistryTab === 'registries'
+                            ? 'border-blue-700 text-blue-700 bg-blue-50/60'
+                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                        }`}
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        Manage Registries
+                      </button>
+                      <button
+                        onClick={() => setProjectsRegistryTab('finance')}
+                        className={`px-4 py-2 text-xs font-extrabold rounded-t-lg border-b-2 transition flex items-center gap-1.5 ${
+                          projectsRegistryTab === 'finance'
+                            ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60'
+                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                        }`}
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        Finance Records
+                      </button>
+                    </div>
+
+                    {projectsRegistryTab === 'registries' ? (
+                    <>
                     {/* Filters Toolbar on top of table (SAGA, Directorate, Delivery Unit, Division, Status, Search) */}
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -2207,6 +2641,77 @@ export default function App() {
                         </div>
                       )}
                     </div>
+                    </>
+                    ) : (
+                    /* ================= FINANCE RECORDS TAB ================= */
+                    <div className="space-y-5">
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                            <BarChart3 className="w-5 h-5 text-emerald-600" />
+                            Finance Records &mdash; Financial Data (Amount in Millions)
+                          </h2>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Assign each project a budget allocated, funds disbursed, funds utilised and funds outstanding. Figures feed the financial bar graph on the project details page.
+                          </p>
+                        </div>
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                          Amounts in KES Millions
+                        </span>
+                      </div>
+
+                      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wide text-[11px]">
+                              <tr>
+                                <th className="py-3 px-4">Project</th>
+                                <th className="py-3 px-3 text-right">Budget Allocated</th>
+                                <th className="py-3 px-3 text-right">Funds Disbursed</th>
+                                <th className="py-3 px-3 text-right">Funds Utilised</th>
+                                <th className="py-3 px-3 text-right">Funds Outstanding</th>
+                                <th className="py-3 px-4 text-center">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {projects.map(pr => {
+                                const allocated = pr.total_budget || 0;
+                                const disbursed = pr.funds_disbursed || 0;
+                                const utilised = pr.funds_utilized || 0;
+                                const outstanding = Math.max(0, allocated - utilised);
+                                const m = (v: number) => (v / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                return (
+                                  <tr key={pr.id} className="hover:bg-slate-50/80 transition">
+                                    <td className="py-3 px-4">
+                                      <div className="font-extrabold text-slate-900 line-clamp-1">{pr.sub_programme}</div>
+                                      <div className="text-[11px] text-slate-500">{pr.delivery_unit || 'Countrywide'}</div>
+                                    </td>
+                                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{m(allocated)}</td>
+                                    <td className="py-3 px-3 text-right font-mono text-emerald-700 font-bold">{m(disbursed)}</td>
+                                    <td className="py-3 px-3 text-right font-mono text-amber-700 font-bold">{m(utilised)}</td>
+                                    <td className="py-3 px-3 text-right font-mono text-rose-700 font-bold">{m(outstanding)}</td>
+                                    <td className="py-3 px-4 text-center">
+                                      {currentUser.can_edit ? (
+                                        <button
+                                          onClick={() => setFinanceEditProject(pr)}
+                                          className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-2.5 py-1.5 rounded transition"
+                                          title="Edit Financing Figures"
+                                        >
+                                          <PenSquare className="w-3.5 h-3.5" /> Edit
+                                        </button>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 font-bold">Read-only</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2240,6 +2745,21 @@ export default function App() {
                         className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1"
                       >
                         <CheckCircle2 className="w-4 h-4" /> Approve &amp; Resolve
+                      </button>
+                    )}
+                    {currentUser.can_edit && (
+                      <button 
+                        onClick={() => setActionChangeDraft({
+                          actionId: selectedAction.id,
+                          refNo: selectedAction.ref_no,
+                          field: 'Status',
+                          oldValue: selectedAction.status,
+                          newValue: '',
+                          reason: ''
+                        })}
+                        className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1"
+                      >
+                        <ClipboardCheck className="w-4 h-4" /> Request Change
                       </button>
                     )}
                     {currentUser.can_edit && (
@@ -2314,6 +2834,48 @@ export default function App() {
                     <div className="bg-slate-50 border border-slate-200 rounded p-4 text-xs text-slate-700 leading-relaxed">
                       {selectedAction.action || 'No progress recorded yet.'}
                     </div>
+                  </div>
+
+                  {/* Change Details / Approval History */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                      <strong className="text-sm text-slate-900">Change Details &amp; Approval History</strong>
+                    </div>
+                    {(() => {
+                      const history = pendingChanges.filter(c => c.actionId === selectedAction.id);
+                      if (history.length === 0) {
+                        return <div className="bg-slate-50 border border-dashed border-slate-200 rounded p-3 text-xs text-slate-400 italic">No change requests recorded for this action point yet.</div>;
+                      }
+                      return (
+                        <div className="space-y-2">
+                          {history.map(c => {
+                            const badge = c.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : c.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800';
+                            return (
+                              <div key={c.id} className="border border-slate-200 rounded p-3 text-xs bg-white">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-800">{c.field}</span>
+                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${badge}`}>{c.status}</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 font-mono">{c.requestedAt}</span>
+                                </div>
+                                <div className="text-slate-700 mb-1">
+                                  <span className="line-through text-rose-600">{c.oldValue}</span>{' '}
+                                  <ArrowRight className="w-3 h-3 inline text-slate-400" />{' '}
+                                  <span className="font-bold text-emerald-700">{c.newValue}</span>
+                                </div>
+                                <div className="text-[11px] text-slate-600"><span className="font-bold text-slate-500">Reason:</span> {c.reason}</div>
+                                <div className="text-[10px] text-slate-500 mt-1">Requested by <strong>{c.requestedBy}</strong></div>
+                                {c.status !== 'Pending' && (
+                                  <div className="text-[10px] text-slate-500 mt-0.5">{c.status} by <strong>{c.approvedBy}</strong> on <span className="font-mono">{c.approvedAt}</span></div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -2718,102 +3280,104 @@ export default function App() {
               </div>
             </div>
 
-            {/* Selected Event Details (Appearing below calendar, above priority legends) */}
-            {selectedDiaryEvent && (
-              <div className="bg-white p-4 rounded-xl border-2 border-blue-600 shadow-md relative transition-all animate-fadeIn">
-                <div className="flex justify-between items-center pb-3 border-b border-slate-200 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2.5 py-1 rounded text-xs font-black uppercase tracking-wider ${
-                      selectedDiaryEvent.category === 'Meeting' ? 'bg-blue-600 text-white' :
-                      selectedDiaryEvent.category === 'Task' ? 'bg-cyan-600 text-white' :
-                      selectedDiaryEvent.category === 'Deadline' ? 'bg-red-600 text-white' :
-                      selectedDiaryEvent.category === 'Event' ? 'bg-amber-500 text-slate-900' : 'bg-slate-600 text-white'
-                    }`}>
-                      {selectedDiaryEvent.category}
-                    </span>
-                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-bold border border-slate-300">
-                      {selectedDiaryEvent.priority} Priority
-                    </span>
-                    <span className="text-xs font-mono font-bold text-blue-900 ml-2">
-                      <span className="inline-block w-2 h-2 rounded-full bg-blue-600 mr-1.5 animate-pulse"></span>
-                      SELECTED EVENT / SCHEDULE DETAILS
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => setSelectedDiaryEvent(null)}
-                    className="text-slate-400 hover:text-slate-700 text-xs font-bold px-2 py-1 rounded hover:bg-slate-100"
-                    title="Close Details Panel"
-                  >
-                    ✕ Close Details
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                  <div className="lg:col-span-2 space-y-3">
-                    <h3 className="text-base font-extrabold text-slate-900">{selectedDiaryEvent.title}</h3>
-                    
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 pb-2 border-b border-slate-100">
-                      <span className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                        <strong>{selectedDiaryEvent.date}</strong>
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-blue-600" />
-                        <strong>{selectedDiaryEvent.time} hrs</strong>
-                      </span>
-                      {selectedDiaryEvent.location && (
-                        <span className="flex items-center gap-1.5 text-slate-700">
-                          <MapPin className="w-3.5 h-3.5 text-red-500" />
-                          <span>{selectedDiaryEvent.location}</span>
+            {/* Selected Event Details — compact popup */}
+            {selectedDiaryEvent && (() => {
+              const ev = selectedDiaryEvent;
+              const linked = projects.filter(p => {
+                const hay = `${ev.location || ''} ${ev.title} ${ev.description}`.toLowerCase();
+                return (p.delivery_unit && hay.includes(p.delivery_unit.toLowerCase())) ||
+                  (p.saga_name && hay.includes(p.saga_name.toLowerCase())) ||
+                  (p.directorate_name && hay.includes(p.directorate_name.toLowerCase()));
+              }).slice(0, 5);
+              const linkedProjects = linked.length > 0 ? linked : projects.slice(0, 4);
+              return (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3" onClick={() => setSelectedDiaryEvent(null)}>
+                  <div className="bg-white w-full max-w-2xl rounded-xl border border-blue-600 shadow-2xl overflow-hidden animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                          ev.category === 'Meeting' ? 'bg-blue-600 text-white' :
+                          ev.category === 'Task' ? 'bg-cyan-600 text-white' :
+                          ev.category === 'Deadline' ? 'bg-red-600 text-white' :
+                          ev.category === 'Event' ? 'bg-amber-500 text-slate-900' : 'bg-slate-600 text-white'
+                        }`}>
+                          {ev.category}
                         </span>
-                      )}
-                      {selectedDiaryEvent.host && (
-                        <span className="flex items-center gap-1.5 text-slate-700">
-                          <User className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Host: <strong>{selectedDiaryEvent.host}</strong></span>
+                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-300">
+                          {ev.priority} Priority
                         </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                        Executive Notes &amp; Objectives
-                      </label>
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed whitespace-pre-line font-medium">
-                        {selectedDiaryEvent.description}
                       </div>
-                    </div>
-
-                    {selectedDiaryEvent.attendees && (
-                      <div className="text-xs text-slate-600 bg-blue-50/60 p-2.5 rounded-lg border border-blue-100">
-                        <strong className="text-blue-900">Key Attendees &amp; Delegation:</strong> {selectedDiaryEvent.attendees}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-                        <Shield className="w-4 h-4 text-emerald-600" />
-                        Integrated State Department Scheduler
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        This diary item is recorded in the State Department for Medical Services operational calendar. All updates sync with Ministerial executive dossiers and field monitoring itineraries.
-                      </p>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-200 mt-4 flex items-center justify-end gap-2">
-                      <button 
+                      <button
                         onClick={() => setSelectedDiaryEvent(null)}
-                        className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded transition-colors"
+                        className="text-slate-400 hover:text-slate-700 text-xs font-bold px-2 py-1 rounded hover:bg-slate-200"
+                        title="Close Details"
                       >
-                        Close Panel
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="p-4 space-y-3 text-xs max-h-[80vh] overflow-y-auto">
+                      <h3 className="text-sm font-extrabold text-slate-900 leading-snug">{ev.title}</h3>
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-slate-600 pb-2 border-b border-slate-100">
+                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-blue-600" /><strong>{ev.date}</strong></span>
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-blue-600" /><strong>{ev.time} hrs</strong></span>
+                        {ev.location && (
+                          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-red-500" />{ev.location}</span>
+                        )}
+                        {ev.host && (
+                          <span className="flex items-center gap-1"><User className="w-3.5 h-3.5 text-indigo-500" />Host: <strong>{ev.host}</strong></span>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Executive Notes &amp; Objectives</div>
+                        <div className="bg-slate-50 p-2.5 rounded border border-slate-200 text-[11px] text-slate-700 leading-relaxed">
+                          {ev.description}
+                        </div>
+                      </div>
+
+                      {ev.attendees && (
+                        <div className="text-[11px] text-slate-600 bg-blue-50/60 p-2 rounded border border-blue-100">
+                          <strong className="text-blue-900">Key Attendees:</strong> {ev.attendees}
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Linked Projects</div>
+                        <ul className="divide-y divide-slate-100 border border-slate-200 rounded overflow-hidden">
+                          {linkedProjects.map(p => (
+                            <li key={p.id}>
+                              <button
+                                onClick={() => {
+                                  setSelectedDiaryEvent(null);
+                                  setActiveTab('projects');
+                                  setSelectedProject(p);
+                                }}
+                                title="Click to view details"
+                                className="w-full text-left px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 hover:text-blue-900 transition flex items-center justify-between gap-2"
+                              >
+                                <span className="truncate">{p.sub_programme}</span>
+                                <span className="text-[9px] text-slate-400 font-normal shrink-0">Click to view details</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 px-4 py-2 border-t border-slate-200 flex justify-end">
+                      <button
+                        onClick={() => setSelectedDiaryEvent(null)}
+                        className="text-[11px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded transition-colors"
+                      >
+                        Close
                       </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Priority Legends (Matching Screenshot Page 5 bottom) */}
             <div className="bg-white p-3 rounded-lg border border-slate-200 flex flex-wrap items-center gap-2 text-xs">
@@ -2888,6 +3452,15 @@ export default function App() {
                       <span>{kpis.filter(k => k.current_achievement >= 90).length} of {kpis.length} Targets Met</span>
                     </div>
                   </div>
+
+                  {currentUser.can_edit && (
+                    <button
+                      onClick={() => { setEditingPcKpi(null); setModalType('pc'); }}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-md"
+                    >
+                      <PlusCircle className="w-4 h-4" /> Add Record
+                    </button>
+                  )}
                 </div>
 
                 {/* 6 Result Areas (Category Weights) Cards */}
@@ -3056,7 +3629,7 @@ export default function App() {
                       onClick={() => { setEditingPcKpi(null); setModalType('pc'); }}
                       className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow-sm"
                     >
-                      <Plus className="w-4 h-4" /> Add Sub-KPI
+                      <Plus className="w-4 h-4" /> Add Record
                     </button>
                   )}
                 </div>
@@ -3898,6 +4471,136 @@ export default function App() {
           </div>
         )}
 
+        {/* ======================= TAB: NOTIFICATIONS & APPROVALS ======================= */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-4">
+            {!canViewNotifications ? (
+              <div className="bg-white rounded-lg border border-red-200 p-8 text-center max-w-xl mx-auto shadow-sm">
+                <ShieldAlert className="w-12 h-12 text-red-600 mx-auto mb-3" />
+                <h3 className="text-base font-bold text-slate-900 mb-1">Access Restricted</h3>
+                <p className="text-xs text-slate-500">Notifications and approval workflows are available to Administrators, the Principal Secretary and other authorised approvers only.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-blue-700" /> Notifications &amp; Approvals
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Key system notifications and pending action-change approvals. Click a notification to open its details in the audit logs.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-black px-3 py-1 rounded-full uppercase">{unreadNotificationCount} unread</span>
+                    <button
+                      onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+                      className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 transition"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Mark all as read
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                  {/* Notifications List */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                      <h3 className="font-extrabold text-sm text-slate-900">All Notifications</h3>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">{notifications.length} total</span>
+                    </div>
+                    <div className="divide-y divide-slate-100 max-h-[560px] overflow-y-auto">
+                      {notifications.length === 0 && (
+                        <div className="p-6 text-center text-xs text-slate-400">No notifications yet.</div>
+                      )}
+                      {notifications.map(n => {
+                        const dot = n.severity === 'approval' ? 'bg-amber-500' : n.severity === 'success' ? 'bg-emerald-500' : n.severity === 'warning' ? 'bg-rose-500' : 'bg-blue-500';
+                        return (
+                          <button
+                            key={n.id}
+                            onClick={() => openNotification(n)}
+                            className={`w-full text-left px-4 py-3 transition flex gap-3 items-start ${n.read ? 'bg-slate-50 text-slate-400 hover:bg-slate-100' : 'bg-white text-slate-800 hover:bg-blue-50/50'}`}
+                          >
+                            <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${n.read ? 'bg-slate-300' : dot}`} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`text-xs font-extrabold truncate ${n.read ? 'text-slate-400' : 'text-slate-900'}`}>{n.title}</span>
+                                {!n.read && <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">NEW</span>}
+                              </div>
+                              <p className={`text-[11px] mt-0.5 line-clamp-2 ${n.read ? 'text-slate-400' : 'text-slate-600'}`}>{n.message}</p>
+                              <div className={`text-[10px] mt-1 flex items-center gap-2 ${n.read ? 'text-slate-300' : 'text-slate-400'}`}>
+                                <span className="font-bold uppercase">{n.module}</span>
+                                <span>•</span>
+                                <span className="font-mono">{n.timestamp}</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Pending Approvals */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                      <h3 className="font-extrabold text-sm text-slate-900">Action Change Approvals</h3>
+                      <span className="text-[10px] font-bold text-amber-600 uppercase">{pendingChanges.filter(c => c.status === 'Pending').length} pending</span>
+                    </div>
+                    <div className="divide-y divide-slate-100 max-h-[560px] overflow-y-auto">
+                      {pendingChanges.length === 0 && (
+                        <div className="p-6 text-center text-xs text-slate-400">No action change requests yet.</div>
+                      )}
+                      {pendingChanges.map(c => {
+                        const badge = c.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : c.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800';
+                        return (
+                          <div key={c.id} className="p-4 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{c.refNo}</span>
+                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${badge}`}>{c.status}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-mono">{c.requestedAt}</span>
+                            </div>
+                            <div className="text-xs text-slate-700">
+                              <span className="font-bold">{c.field}:</span>{' '}
+                              <span className="line-through text-rose-600">{c.oldValue}</span>{' '}
+                              <ArrowRight className="w-3 h-3 inline text-slate-400" />{' '}
+                              <span className="font-bold text-emerald-700">{c.newValue}</span>
+                            </div>
+                            <div className="text-[11px] bg-slate-50 border border-slate-100 rounded p-2 text-slate-600">
+                              <span className="font-bold text-slate-500 uppercase text-[9px] block mb-0.5">Reason given</span>
+                              {c.reason}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              Requested by <strong className="text-slate-700">{c.requestedBy}</strong>
+                            </div>
+                            {c.status === 'Pending' ? (
+                              currentUser.can_approve ? (
+                                <div className="flex items-center gap-2 pt-1">
+                                  <button onClick={() => approvePendingChange(c)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-1.5 rounded flex items-center gap-1 transition">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                                  </button>
+                                  <button onClick={() => rejectPendingChange(c)} className="bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold px-3 py-1.5 rounded flex items-center gap-1 transition">
+                                    <X className="w-3.5 h-3.5" /> Reject
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-amber-600 font-bold">Awaiting approval by an authorised approver.</div>
+                              )
+                            ) : (
+                              <div className="text-[10px] text-slate-500 bg-slate-50 rounded p-2 border border-slate-100">
+                                {c.status} by <strong className="text-slate-700">{c.approvedBy}</strong> on <span className="font-mono">{c.approvedAt}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ======================= TAB: CPANEL & BACKUP ======================= */}
         {activeTab === 'backup' && (
           <div className="space-y-6">
@@ -4424,6 +5127,155 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* Action Change Request Modal */}
+      {actionChangeDraft && (() => {
+        const ap = actionPoints.find(a => a.id === actionChangeDraft.actionId);
+        const oldValueFor = (field: string) => {
+          if (!ap) return '';
+          if (field === 'Status') return ap.status;
+          if (field === 'Action / Progress') return ap.action || '';
+          if (field === 'Person Responsible') return ap.person_responsible;
+          if (field === 'Timeline') return ap.timeline;
+          return '';
+        };
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden text-xs">
+              <div className="bg-gradient-to-r from-amber-600 to-orange-700 text-white px-4 py-3 font-bold flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="w-4 h-4" />
+                  <div>
+                    <div className="text-sm font-extrabold leading-tight">Request Action Change</div>
+                    <div className="text-[10px] text-amber-100 font-normal">{actionChangeDraft.refNo} &mdash; submitted for approval</div>
+                  </div>
+                </div>
+                <button onClick={() => setActionChangeDraft(null)}><X className="w-4 h-4" /></button>
+              </div>
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Field to Change</label>
+                  <select
+                    value={actionChangeDraft.field}
+                    onChange={(e) => {
+                      const field = e.target.value;
+                      setActionChangeDraft({ ...actionChangeDraft, field, oldValue: oldValueFor(field), newValue: '' });
+                    }}
+                    className="w-full border border-slate-300 rounded p-2 text-xs font-semibold"
+                  >
+                    <option value="Status">Status</option>
+                    <option value="Action / Progress">Action / Progress</option>
+                    <option value="Person Responsible">Person Responsible</option>
+                    <option value="Timeline">Timeline</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Current Value</label>
+                  <input type="text" readOnly value={actionChangeDraft.oldValue} className="w-full border border-slate-200 bg-slate-100 rounded p-2 text-xs text-slate-500" />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">New Value</label>
+                  <input
+                    type="text"
+                    value={actionChangeDraft.newValue}
+                    onChange={(e) => setActionChangeDraft({ ...actionChangeDraft, newValue: e.target.value })}
+                    placeholder="Enter the proposed new value"
+                    className="w-full border border-slate-300 rounded p-2 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Reason for Change <span className="text-rose-600">*</span></label>
+                  <textarea
+                    rows={3}
+                    value={actionChangeDraft.reason}
+                    onChange={(e) => setActionChangeDraft({ ...actionChangeDraft, reason: e.target.value })}
+                    placeholder="Explain why this change is required (mandatory)"
+                    className="w-full border border-slate-300 rounded p-2 text-xs"
+                  />
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-800">
+                  This change will be recorded as <strong>PENDING APPROVAL</strong>. An authorised approver must approve it before it takes effect. The approver's account and timestamp will be captured.
+                </div>
+              </div>
+              <div className="bg-slate-50 px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
+                <button onClick={() => setActionChangeDraft(null)} className="px-3 py-1.5 rounded bg-slate-200 font-bold text-slate-700">Cancel</button>
+                <button
+                  onClick={submitActionChange}
+                  disabled={!actionChangeDraft.newValue.trim() || !actionChangeDraft.reason.trim()}
+                  className="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold"
+                >
+                  Submit for Approval
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Finance Records Edit Modal */}
+      {financeEditProject && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden text-xs">
+            <div className="bg-gradient-to-r from-emerald-700 to-teal-800 text-white px-4 py-3 font-bold flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                <div>
+                  <div className="text-sm font-extrabold leading-tight">Edit Financing Figures</div>
+                  <div className="text-[10px] text-emerald-100 font-normal line-clamp-1">{financeEditProject.sub_programme}</div>
+                </div>
+              </div>
+              <button onClick={() => setFinanceEditProject(null)}><X className="w-4 h-4" /></button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const toKes = (key: string) => Math.round(Number(fd.get(key) || 0) * 1_000_000);
+                const allocated = toKes('fin_allocated');
+                const disbursed = toKes('fin_disbursed');
+                const utilised = toKes('fin_utilised');
+                const target = financeEditProject;
+                setProjects(prev => prev.map(p => p.id === target.id ? {
+                  ...p,
+                  total_budget: allocated,
+                  funds_disbursed: disbursed,
+                  funds_utilized: utilised,
+                } : p));
+                const log = logAudit('update', 'Finance Records', `Updated financing for "${target.sub_programme}": Allocated ${(allocated/1e6).toFixed(2)}M, Disbursed ${(disbursed/1e6).toFixed(2)}M, Utilised ${(utilised/1e6).toFixed(2)}M, Outstanding ${((allocated-utilised)/1e6).toFixed(2)}M`, target.id);
+                pushNotification('Financing figures updated', `"${target.sub_programme}" financing was updated by ${currentUser.full_name}.`, 'Finance Records', 'info', log.id);
+                showToast('Financing figures saved successfully.');
+                setFinanceEditProject(null);
+              }}
+              className="p-4 space-y-3"
+            >
+              <p className="text-slate-600">Enter amounts in <strong>KES Millions</strong>. Funds outstanding is calculated automatically as Budget Allocated minus Funds Utilised.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Budget Allocated (M)</label>
+                  <input type="number" step="0.01" min="0" name="fin_allocated" defaultValue={(financeEditProject.total_budget || 0) / 1_000_000} className="w-full border border-slate-300 rounded p-2 text-xs font-mono" required />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Funds Disbursed (M)</label>
+                  <input type="number" step="0.01" min="0" name="fin_disbursed" defaultValue={(financeEditProject.funds_disbursed || 0) / 1_000_000} className="w-full border border-slate-300 rounded p-2 text-xs font-mono" required />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Funds Utilised (M)</label>
+                  <input type="number" step="0.01" min="0" name="fin_utilised" defaultValue={(financeEditProject.funds_utilized || 0) / 1_000_000} className="w-full border border-slate-300 rounded p-2 text-xs font-mono" required />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-600 block mb-1">Funds Outstanding (M)</label>
+                  <input type="text" readOnly value={(((financeEditProject.total_budget || 0) - (financeEditProject.funds_utilized || 0)) / 1_000_000).toFixed(2)} className="w-full border border-slate-200 bg-slate-100 rounded p-2 text-xs font-mono text-slate-500" />
+                  <span className="text-[10px] text-slate-400">Auto-calculated</span>
+                </div>
+              </div>
+              <div className="bg-slate-50 px-0 pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button type="button" onClick={() => setFinanceEditProject(null)} className="px-3 py-1.5 rounded bg-slate-200 font-bold text-slate-700">Cancel</button>
+                <button type="submit" className="px-4 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold">Save Figures</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Generic Modal for Adding / Editing Other Records */}
       {modalType && modalType !== 'pc' && (
