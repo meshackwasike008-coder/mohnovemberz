@@ -19,6 +19,16 @@ The original single-file layout and functionality are retained (Dashboard, Prior
 2. Navigate to **public_html**.
 3. Upload this entire zip archive (`pp-sdoms-php.zip`) into `public_html`.
 4. Right-click the uploaded zip file and select **Extract**. Extract all files directly into `public_html`.
+5. When asked, choose **Overwrite** for every existing file.
+
+> ⚠️ **IMPORTANT — always upload `index.php` and `db.php` together.**
+> `index.php` depends on the helper functions defined in `db.php` (`current_user()`,
+> `audit_log()`, `notify()`, `project_progress()`, `h()`, `m_fmt()`, …).
+> If you replace only `index.php` and keep an older `db.php`, the page will stop with
+> `Call to undefined function current_user()`. The current `db.php` identifies itself
+> with `define('PP_SDOMS_DB_VERSION', '2.0');` at the top — if that line is missing,
+> the file is out of date. Newer builds detect the mismatch and show a clear
+> "db.php is out of date" page instead of a fatal error.
 
 ### Step 2: Create MySQL Database & User
 1. In cPanel, go to **MySQL® Database Wizard**.

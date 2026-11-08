@@ -1,6 +1,11 @@
 <?php
 // db.php - Database Connection + shared helpers for PP-SDOMS (Standalone PHP / cPanel)
 // Edit the four credentials below to match your cPanel MySQL database.
+//
+// VERSION: 2.0  (must be deployed together with index.php v2)
+// If index.php reports "db.php is out of date", this file was not replaced.
+
+define('PP_SDOMS_DB_VERSION', '2.0');
 
 $host = 'localhost';
 $dbname = 'moh_sdoms_db';

@@ -1,5 +1,42 @@
 <?php
-require_once 'db.php';
+/* =====================================================================
+   PP-SDOMS — Standalone PHP / cPanel
+   ---------------------------------------------------------------------
+   IMPORTANT: this file REQUIRES the matching db.php (v2, with helpers).
+   If you see "undefined function current_user()", you uploaded the new
+   index.php but kept an older db.php. Upload BOTH files together.
+   ===================================================================== */
+require_once __DIR__ . '/db.php';
+
+if (!function_exists('current_user') || !function_exists('audit_log') || !function_exists('notify')) {
+    http_response_code(500);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html><head><meta charset="utf-8"><title>PP-SDOMS — db.php out of date</title>'
+        . '<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#e2e8f0;'
+        . 'margin:0;padding:48px 20px}.card{max-width:760px;margin:0 auto;background:#1e293b;border:1px solid #334155;'
+        . 'border-radius:14px;padding:32px}h1{margin:0 0 8px;font-size:22px;color:#f8fafc}'
+        . 'p{line-height:1.65;color:#cbd5e1}code{background:#0f172a;border:1px solid #334155;border-radius:6px;'
+        . 'padding:2px 6px;font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#7dd3fc}'
+        . 'ol{line-height:1.9;color:#cbd5e1}.tag{display:inline-block;background:#7f1d1d;color:#fecaca;'
+        . 'border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;letter-spacing:.04em;margin-bottom:16px}'
+        . 'b{color:#f8fafc}</style></head><body><div class="card">'
+        . '<div class="tag">CONFIGURATION MISMATCH</div>'
+        . '<h1>db.php is out of date</h1>'
+        . '<p>Your <code>index.php</code> is the current version, but <code>db.php</code> is an older copy that is '
+        . 'missing the shared helper functions (<code>current_user()</code>, <code>audit_log()</code>, '
+        . '<code>notify()</code>, <code>project_progress()</code>, etc.).</p>'
+        . '<p><b>Fix:</b> upload the <code>db.php</code> that ships with this package, replacing the existing one, '
+        . 'and make sure both files are in the same folder.</p>'
+        . '<ol><li>Open cPanel → <b>File Manager</b>.</li>'
+        . '<li>Go to the folder containing <code>index.php</code>.</li>'
+        . '<li>Upload <code>db.php</code> from the package and choose <b>Overwrite</b>.</li>'
+        . '<li>Set the four database credentials at the top of <code>db.php</code>.</li>'
+        . '<li>Reload this page.</li></ol>'
+        . '<p>Package files must always be deployed together: <code>index.php</code>, <code>db.php</code>, '
+        . '<code>schema.sql</code>, <code>migration_001.sql</code>, <code>migration_002_features.sql</code>.</p>'
+        . '</div></body></html>';
+    exit;
+}
 
 /* =====================================================================
    PP-SDOMS — Standalone PHP / cPanel
